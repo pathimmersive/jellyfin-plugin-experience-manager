@@ -8,6 +8,7 @@ using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Model.Plugins;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Xunit;
 
 namespace Jellyfin.Plugin.ExperienceManager.Tests;
@@ -71,9 +72,19 @@ public class PluginShapeTests
         var services = new ServiceCollection();
 
         ((IPluginServiceRegistrator)Activator.CreateInstance(registrator)!).RegisterServices(services, null!);
+        var registered = services.ToList();
 
+        // Jellyfin's container provides logging and its own managers to every service.
+        services.AddLogging();
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.Library.IUserManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.Library.IUserDataManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.Library.IUserViewManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.TV.ITVSeriesManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Controller.Dto.IDtoService>());
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
-        foreach (var descriptor in services.Where(d => !d.ServiceType.IsGenericTypeDefinition))
+        Assert.NotEmpty(registered);
+        foreach (var descriptor in registered.Where(d => !d.ServiceType.IsGenericTypeDefinition))
         {
             Assert.NotNull(provider.GetService(descriptor.ServiceType));
         }
