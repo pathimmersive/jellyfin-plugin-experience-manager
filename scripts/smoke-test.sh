@@ -238,6 +238,41 @@ code="$(get_status -H "$auth" "$base/web/ConfigurationPage?name=$PAGE_NAME")"
 grep -q 'pluginConfigurationPage' "$work/body" || fail "the admin page served is not the plugin's page"
 pass "the server serves $PLUGIN_NAME's admin page"
 
+# The public home API: discovery without a token, every v1 route refused without one, the page's
+# sections in order with per-section timing and an ETag that gets 304, and no Home Screen Sections routes.
+code="$(get_status "$base/ExperienceManager/Info")"
+[ "$code" = "200" ] && grep -q '"ApiVersions":\["v1"\]' "$work/body" || fail "anonymous GET /ExperienceManager/Info returned $code: $(cat "$work/body")"
+pass "anonymous GET /ExperienceManager/Info reports API v1"
+for path in "ExperienceManager/v1/Pages/home" "ExperienceManager/v1/Sections/featured/Items"; do
+    code="$(get_status "$base/$path")"
+    [ "$code" = "401" ] || fail "GET /$path without a token returned $code, expected 401"
+done
+pass "the v1 routes answer 401 without a token"
+code="$(curl -s -D "$work/page-headers" -o "$work/body" -w '%{http_code}' -H "$auth" "$base/ExperienceManager/v1/Pages/home?include=items")"
+[ "$code" = "200" ] || fail "GET /ExperienceManager/v1/Pages/home returned $code: $(cat "$work/body")"
+ids="$(grep -o '"Id":"[a-z]*"' "$work/body" | sed 's/"Id":"\([a-z]*\)"/\1/' | tr '\n' ' ')"
+[ "$ids" = "featured continue nextup " ] || fail "the page's sections are '$ids', expected 'featured continue nextup ' on a server with no libraries"
+grep -q '"Hint":"feature","Shape":"landscape"' "$work/body" || fail "the featured section has no feature hint: $(cat "$work/body")"
+grep -q '"Items":{"Items":\[\]' "$work/body" || fail "include=items did not inline the sections' items: $(cat "$work/body")"
+grep -qiE '^server-timing: *featured;desc="(hit|miss)";dur=.*continue;desc="(hit|miss)";dur=.*nextup;desc=' "$work/page-headers" || fail "the page has no per-section Server-Timing: $(grep -i '^server-timing' "$work/page-headers")"
+etag="$(grep -i '^etag:' "$work/page-headers" | sed 's/^[^:]*: *//' | tr -d '\r')"
+code="$(get_status -H "$auth" -H "If-None-Match: $etag" "$base/ExperienceManager/v1/Pages/home?include=items")"
+[ "$code" = "304" ] || fail "the page with its ETag returned $code, expected 304"
+pass "GET /ExperienceManager/v1/Pages/home lists featured, Continue Watching and Next Up with items, Server-Timing and an ETag that gets 304"
+code="$(get_status -H "$auth" "$base/ExperienceManager/v1/Sections/continue/Items?startIndex=0&limit=5")"
+[ "$code" = "200" ] && grep -q '"TotalRecordCount":0' "$work/body" || fail "GET a section's items returned $code: $(cat "$work/body")"
+code="$(get_status -H "$auth" "$base/ExperienceManager/v1/Sections/no-such-section/Items")"
+[ "$code" = "404" ] || fail "an unknown section returned $code, expected 404"
+pass "section items are paged, and an unknown section is 404"
+for path in "HomeScreen/Sections" "HomeScreen/Section/ContinueWatching"; do
+    code="$(get_status -H "$auth" "$base/$path")"
+    [ "$code" = "404" ] || fail "GET /$path returned $code; the plugin must not serve Home Screen Sections' routes"
+done
+pass "none of Home Screen Sections' /HomeScreen routes are served"
+code="$(get_status -H "$auth" "$base/ScheduledTasks")"
+grep -q '"Name":"Warm the home screen cache"' "$work/body" || fail "Dashboard → Scheduled Tasks does not list the cache warm-up task"
+pass "Dashboard → Scheduled Tasks lists the home screen cache warm-up"
+
 grep -q 'Home client added to jellyfin-web' "$work/server.log" \
     || fail "the plugin did not log that it adds the home client to jellyfin-web"
 pass "the plugin logs that it adds the home client to jellyfin-web"

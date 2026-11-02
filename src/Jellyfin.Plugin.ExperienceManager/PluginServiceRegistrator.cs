@@ -1,6 +1,10 @@
+using Jellyfin.Plugin.ExperienceManager.Caching;
+using Jellyfin.Plugin.ExperienceManager.Home;
 using Jellyfin.Plugin.ExperienceManager.Integration;
+using Jellyfin.Plugin.ExperienceManager.Tasks;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,5 +20,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddSingleton<HomeClient>();
         serviceCollection.AddTransient<IStartupFilter, IndexPageStartupFilter>();
+
+        serviceCollection.AddSingleton<HomeCache>();
+        serviceCollection.AddSingleton<IHomeSources, JellyfinHomeSources>();
+        serviceCollection.AddSingleton<IHomePage, FixedHomePage>();
+        serviceCollection.AddSingleton<HomePageService>();
+        serviceCollection.AddSingleton<IScheduledTask, WarmHomeCacheTask>();
     }
 }

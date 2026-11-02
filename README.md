@@ -8,6 +8,15 @@ Experience Manager is a Jellyfin server plugin that gives server admins control 
 
 Early development; there is no release yet and the plugin does nothing useful so far. It builds, installs, and adds an empty admin page with its own entry in the Dashboard sidebar.
 
+## Home API
+
+Experience Manager's home screen reads from a public API that other clients can use too. Every route answers for the signed-in user, with their usual Jellyfin token:
+- `GET /ExperienceManager/Info` reports the plugin version and the API versions it serves. It needs no token.
+- `GET /ExperienceManager/v1/Pages/home` lists the Home page's sections in order. With `include=items`, it also carries their first items.
+- `GET /ExperienceManager/v1/Sections/{sectionId}/Items?startIndex=&limit=` pages one section's items.
+
+Items are Jellyfin's own `BaseItemDto`, and the API takes Jellyfin's `fields`, `enableImageTypes`, `imageTypeLimit` and `enableUserData` parameters. The API is early and may still change before the first release.
+
 ## Requirements
 
 - Jellyfin 12.0 or later. The build targets 12.2.
