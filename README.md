@@ -11,6 +11,7 @@ Early development; there is no release yet and the plugin does nothing useful so
 ## Requirements
 
 - Jellyfin 12.0 or later. The build targets 12.2.
+- No other plugins. Experience Manager adds its home client to jellyfin-web as the page is served and never changes jellyfin-web's files. It also works alongside the [File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation) plugin, which other plugins use.
 
 ## Building and testing
 
@@ -23,7 +24,7 @@ bash scripts/coverage.sh               # the tests, with a coverage summary
 ```
 
 These also need Docker. CI runs them on every pull request.
-- `bash scripts/smoke-test.sh` loads the plugin into a real Jellyfin server and checks what it reports and serves: the plugin active with its image, and its admin page in the Dashboard sidebar.
+- `bash scripts/smoke-test.sh` loads the plugin into a real Jellyfin server and checks what it reports and serves. That covers the plugin active with its image, its admin page in the Dashboard sidebar, and the home client added to jellyfin-web's page. The page checks also run alongside File Transformation and under a BaseUrl.
 - `bash scripts/repo-install-check.sh` installs the plugin the way an admin does, from a plugin repository served from a local container. With `--upgrade`, it then upgrades to a newer version from the same repository.
 
 ## Questions, contributing and security

@@ -23,6 +23,9 @@
   <ItemGroup>
     <!-- The admin page, served by Jellyfin from the plugin assembly. -->
     <EmbeddedResource Include="Web\admin.html" />
+    <!-- The home client, which jellyfin-web loads from /ExperienceManager/home.js and home.css. -->
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\home\home.js" LogicalName="home.js" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\home\home.css" LogicalName="home.css" />
   </ItemGroup>
 
   <!-- The plugin image: Dashboard → Plugins shows it from the plugin folder (meta.json's imagePath), and the

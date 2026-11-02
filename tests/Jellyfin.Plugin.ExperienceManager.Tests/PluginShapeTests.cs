@@ -71,9 +71,13 @@ public class PluginShapeTests
         var services = new ServiceCollection();
 
         ((IPluginServiceRegistrator)Activator.CreateInstance(registrator)!).RegisterServices(services, null!);
+        var registered = services.ToList();
 
+        // Jellyfin's container provides logging to every service.
+        services.AddLogging();
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
-        foreach (var descriptor in services.Where(d => !d.ServiceType.IsGenericTypeDefinition))
+        Assert.NotEmpty(registered);
+        foreach (var descriptor in registered.Where(d => !d.ServiceType.IsGenericTypeDefinition))
         {
             Assert.NotNull(provider.GetService(descriptor.ServiceType));
         }
