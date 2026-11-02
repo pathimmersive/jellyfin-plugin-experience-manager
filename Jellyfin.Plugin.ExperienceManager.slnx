@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Jellyfin.Plugin.ExperienceManager/Jellyfin.Plugin.ExperienceManager.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Jellyfin.Plugin.ExperienceManager.Tests/Jellyfin.Plugin.ExperienceManager.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- The Jellyfin.Controller version the plugin and its tests build against. A plugin built
+         against a newer Jellyfin is refused by an older server. Override with -p:JellyfinVersion=<version>. -->
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">12.2.0</JellyfinVersion>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.ExperienceManager</RootNamespace>
+    <Version>0.1.0.0</Version>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The plugin ABI the build declares; Jellyfin refuses to load a plugin whose targetAbi is newer than the server. -->
+    <JellyfinTargetAbi>12.0.0.0</JellyfinTargetAbi>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The host provides these at runtime; ExcludeAssets keeps them out of the plugin folder. -->
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.ExperienceManager.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The admin page, served by Jellyfin from the plugin assembly. -->
+    <EmbeddedResource Include="Web\admin.html" />
+  </ItemGroup>
+
+  <!-- The plugin image: Dashboard → Plugins shows it from the plugin folder (meta.json's imagePath), and the
+       plugin repository's manifest points the catalog at the same file in the repository (imageUrl). -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\images\icon.png" Link="icon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- meta.json is the plugin manifest Jellyfin reads from the plugin folder. -->
+  <Target Name="WritePluginMeta" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <_PluginMetaPath>$(IntermediateOutputPath)meta.json</_PluginMetaPath>
+      <_PluginMetaJson>{
+  "category": "General",
+  "description": "Server-side control over what every user sees on the Jellyfin home screen.",
+  "guid": "49cf9109-2fbf-4d2e-9eb7-6def4f1efb1e",
+  "imagePath": "icon.png",
+  "imageUrl": "https://raw.githubusercontent.com/pathimmersive/jellyfin-plugin-experience-manager/main/images/icon.png",
+  "name": "Experience Manager",
+  "overview": "Programme the home screen for your users from one admin page.",
+  "owner": "experience-manager",
+  "targetAbi": "$(JellyfinTargetAbi)",
+  "version": "$(Version)"
+}</_PluginMetaJson>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_PluginMetaPath)" Lines="$(_PluginMetaJson)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <None Include="$(_PluginMetaPath)" Link="meta.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <FileWrites Include="$(_PluginMetaPath)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <title>Experience Manager</title>
+  <rect x="0" y="0" width="640" height="360" rx="0" fill="#101826"/>
+  <rect x="80" y="48" width="480" height="124" rx="14" fill="#2f6fd6"/>
+  <rect x="108" y="128" width="120" height="14" rx="7" fill="#f2b84b"/>
+  <rect x="80" y="196" width="86" height="56" rx="8" fill="#3a4a63"/>
+  <rect x="178" y="196" width="86" height="56" rx="8" fill="#3a4a63"/>
+  <rect x="276" y="196" width="86" height="56" rx="8" fill="#3a4a63"/>
+  <rect x="374" y="196" width="86" height="56" rx="8" fill="#3a4a63"/>
+  <rect x="472" y="196" width="86" height="56" rx="8" fill="#3a4a63"/>
+  <rect x="80" y="268" width="86" height="64" rx="8" fill="#3a4a63"/>
+  <rect x="178" y="268" width="86" height="64" rx="8" fill="#3a4a63"/>
+  <rect x="276" y="268" width="86" height="64" rx="8" fill="#3a4a63"/>
+  <rect x="374" y="268" width="86" height="64" rx="8" fill="#3a4a63"/>
+  <rect x="472" y="268" width="86" height="64" rx="8" fill="#3a4a63"/>
+</svg>

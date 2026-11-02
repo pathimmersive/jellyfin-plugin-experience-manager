@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in Experience Manager does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security problems go through private reporting instead; see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin server version
+      placeholder: "12.2.0"
+    validations:
+      required: true
+  - type: input
+    id: experience-manager-version
+    attributes:
+      label: Experience Manager version or commit
+      description: Shown on the server's Dashboard, under Plugins.
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client app and its version
+      description: For example a browser, the LG webOS app, Android TV, Jellyfin Desktop.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+    validations:
+      required: true
+  - type: input
+    id: other-plugins
+    attributes:
+      label: Other plugins that change jellyfin-web, if any
+      description: For example File Transformation, Home Screen Sections or Media Bar.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log lines, if any
+      description: Lines mentioning Experience Manager from the server log. Remove tokens and addresses you do not want to share.
+      render: text

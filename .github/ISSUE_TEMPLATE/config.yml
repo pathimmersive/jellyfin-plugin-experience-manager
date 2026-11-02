@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/pathimmersive/jellyfin-plugin-experience-manager/discussions/categories/q-a
+    about: Ask how to install, set up or use Experience Manager.
+  - name: Share an idea
+    url: https://github.com/pathimmersive/jellyfin-plugin-experience-manager/discussions/categories/ideas
+    about: Talk an idea through before opening a feature request.
+  - name: Report a security problem
+    url: https://github.com/pathimmersive/jellyfin-plugin-experience-manager/security/advisories/new
+    about: Report security problems privately, not in a public issue.
