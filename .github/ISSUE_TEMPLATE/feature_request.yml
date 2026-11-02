@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something Experience Manager should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: To talk an idea through first, start a discussion in Ideas.
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to do
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters to you
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: The client app and device you would use it on
