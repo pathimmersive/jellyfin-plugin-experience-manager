@@ -10,12 +10,12 @@ const home = require('../../src/home/home.js');
 const repo = path.join(__dirname, '..', '..');
 const read = file => fs.readFileSync(path.join(repo, file), 'utf8');
 
-test('rows are as tall as the design says, per layout', () => {
+test('rows are as tall as the design says, per layout, with room for a focused card under the title', () => {
     const continueRow = { Id: 'continue', Display: { Shape: 'landscape' } };
     const latestRow = { Id: 'latest-x', Display: { Shape: 'portrait' } };
     const myMedia = { Id: 'mymedia', Display: { Shape: 'landscape' } };
-    assert.equal(home.rowHeight(home.SIZES.tv, continueRow), 48 + 166 + 62 + 14);
-    assert.equal(home.rowHeight(home.SIZES.web, latestRow), 40 + 225 + 30 + 14);
+    assert.equal(home.rowHeight(home.SIZES.tv, continueRow), 48 + 12 + 166 + 62 + 14);
+    assert.equal(home.rowHeight(home.SIZES.web, latestRow), 40 + 3 + 225 + 30 + 14);
     assert.deepEqual(home.cardSize(home.SIZES.phone, myMedia), [264, 148]);
     assert.deepEqual(home.cardSize(home.SIZES.phone, continueRow), [240, 135]);
 });

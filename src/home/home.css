@@ -18,8 +18,14 @@ html.em-active #indexPage .homeSectionsContainer {
 
 /* --- loading ---------------------------------------------------------------------------------- */
 
-/* While jellyfin-web starts on Home: placeholders over everything, fading into the drawn page.
-   It never takes a click or a key. */
+/* While jellyfin-web starts on Home: first only the background, then Home's placeholders or Home
+   itself, and a status line if it takes a while. It never takes a click or a key, and jellyfin-web's
+   own splash and spinner stay out of sight beneath it. */
+html.em-booting .docspinner,
+html.em-booting .splashLogo {
+    visibility: hidden !important;
+}
+
 .em-boot {
     position: fixed;
     top: 0;
@@ -29,22 +35,92 @@ html.em-active #indexPage .homeSectionsContainer {
     z-index: 1000;
     overflow: hidden;
     background: #101010;
+    color: #fff;
+    font-family: "Noto Sans", sans-serif;
     pointer-events: none;
-    transition: opacity 0.3s ease-out;
+    transition: opacity 0.35s ease-out;
 }
 
 .em-boot.em-boot-out {
     opacity: 0;
 }
 
-/* One layer pulses, not each placeholder: cheap on an older TV. */
-.em-skeleton {
-    animation: em-pulse 1.6s ease-in-out infinite;
+.em-boot-page {
+    position: absolute;
+    right: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
 }
 
-@keyframes em-pulse {
-    0%, 100% { opacity: 0.55; }
-    50% { opacity: 1; }
+.em-boot-shown .em-boot-page {
+    opacity: 1;
+}
+
+.em-boot-status {
+    position: absolute;
+    bottom: 7%;
+    left: 50%;
+    min-width: 18em;
+    max-width: 80%;
+    padding: 0.9em 1.4em 1em;
+    border-radius: 1.6em;
+    background: rgba(16, 16, 16, 0.9);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    opacity: 0;
+    transform: translate(-50%, 8px);
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.em-boot-status-on .em-boot-status {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.em-boot-label {
+    margin-bottom: 0.7em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.9;
+}
+
+.em-boot-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+}
+
+.em-boot-bar div {
+    height: 100%;
+    background: #00a4dc;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.6s ease-out;
+}
+
+/* Placeholders: one soft sweep of light across them all, one layer, cheap on an older TV. */
+.em-skeleton {
+    position: relative;
+    overflow: hidden;
+}
+
+.em-sweep {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40%;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0));
+    transform: translateX(-100%);
+    animation: em-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes em-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
 }
 
 .em-reveal {
@@ -140,7 +216,13 @@ html.em-active #indexPage .homeSectionsContainer {
     margin-bottom: 14px;
 }
 
+/* Laid out the same whether a real button or the loading screen's still copy of one. */
 .em-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    line-height: 1;
     margin-right: 12px;
     padding: 0 1.2em;
     border: 0;
@@ -323,12 +405,18 @@ html.em-active #indexPage .homeSectionsContainer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .em-skeleton,
     .em-reveal {
         animation: none;
     }
 
+    .em-sweep {
+        display: none;
+    }
+
     .em-boot,
+    .em-boot-page,
+    .em-boot-status,
+    .em-boot-bar div,
     .em-img,
     .em-dot,
     .em-tv .em-card {

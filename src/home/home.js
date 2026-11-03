@@ -16,25 +16,29 @@
     var SETTINGS_WAIT_MS = 1000;
     var INLINE_SECTIONS = 4;
     var FALLBACK_FLAG = 'em-home-fallback';
-    var BOOT_MS = 10000;
+    var BOOT_QUIET_MS = 250;
+    var BOOT_STATUS_MS = 2500;
+    var BOOT_SLOW_MS = 8000;
+    var BOOT_MS = 20000;
     // Where jellyfin-web puts Home's top edge, per layout, until the page is there to measure.
     var BOOT_TOP = { tv: 134, web: 48, phone: 48 };
 
     // Sizes in px per layout, from the design's Platforms and sizes table. room: the space a focused
-    // card's ring (and, on a TV, its growth) needs around it inside its row.
+    // card's ring (and, on a TV, its growth) needs around it inside its row; clear: the space added
+    // below a row's title so that ring stays clear of the title's text.
     var SIZES = {
         tv: {
-            feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10, room: 18,
+            feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10, room: 18, clear: 12,
             landscape: [296, 166], tile: [296, 166], portrait: [160, 240],
             caption: [34, 62], captionSize: [20, 16], logo: 52, overview: [20, 640], button: [20, 52], message: 64
         },
         web: {
-            feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6, room: 8,
+            feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6, room: 8, clear: 3,
             landscape: [278, 156], tile: [278, 156], portrait: [150, 225],
             caption: [30, 52], captionSize: [15, 13], logo: 48, overview: [16, 560], button: [15, 42], message: 56
         },
         phone: {
-            feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4, room: 6,
+            feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4, room: 6, clear: 2,
             landscape: [240, 135], tile: [264, 148], portrait: [118, 177],
             caption: [28, 48], captionSize: [14, 12], logo: 34, overview: [14, 360], button: [15, 44], message: 52
         }
@@ -61,7 +65,7 @@
     }
 
     function rowHeight(sizes, section) {
-        return sizes.titleBlock + cardSize(sizes, section)[1] + sizes.caption[captionLines(section) - 1] + sizes.rowGap;
+        return sizes.titleBlock + sizes.clear + cardSize(sizes, section)[1] + sizes.caption[captionLines(section) - 1] + sizes.rowGap;
     }
 
     function imageUrl(base, itemId, type, tag, width, dpr) {
@@ -480,13 +484,16 @@
             };
             img.onerror = function () { if (onload) onload(); };
             img.src = src;
+            // Already in the browser's cache (the loading screen drew it): shown at once, no fade.
+            if (img.complete && img.naturalWidth) img.className = 'em-img em-loaded';
             container.appendChild(img);
             return img;
         }
 
         function sectionTitle(sizes, text) {
             var title = el('h2', 'em-row-title', text);
-            title.style.height = px(sizes.titleBlock);
+            // The text keeps its place; the space below it leaves room for a focused card's ring.
+            title.style.height = px(sizes.titleBlock + sizes.clear);
             title.style.lineHeight = px(sizes.titleBlock);
             title.style.fontSize = px(sizes.titleSize);
             return title;
@@ -500,6 +507,7 @@
             // Featured is followed by My Media, Continue Watching, Next Up and Latest, the page's fixed order.
             var guesses = [{ Id: 'mymedia', Display: { Shape: 'landscape' } }, { Id: 'continue', Display: { Shape: 'landscape' } }, { Id: 'latest', Display: { Shape: 'portrait' } }];
             for (var i = 0; i < guesses.length; i++) frame.appendChild(placeholderRow(sizes, guesses[i], ''));
+            frame.appendChild(el('div', 'em-sweep'));
             return frame;
         }
 
@@ -528,11 +536,12 @@
             return box;
         }
 
-        function card(sizes, section, item, serverId, onImage) {
+        // inert: drawn for the loading screen, neither a link nor focusable.
+        function card(sizes, section, item, serverId, onImage, inert) {
             var size = cardSize(sizes, section);
             var shape = section.Id === 'mymedia' ? 'landscape' : section.Display.Shape;
-            var link = el('a', 'em-card em-focusable focusable');
-            link.href = section.Id === 'mymedia' ? libraryHash(item, serverId) : detailsHash(item.Id, serverId);
+            var link = el(inert ? 'div' : 'a', inert ? 'em-card' : 'em-card em-focusable focusable');
+            if (!inert) link.href = section.Id === 'mymedia' ? libraryHash(item, serverId) : detailsHash(item.Id, serverId);
             link.style.width = px(size[0]);
             link.style.marginRight = px(sizes.gap);
             var art = el('div', 'em-card-art');
@@ -565,15 +574,17 @@
             return link;
         }
 
-        function fillRow(row, sizes, section, items, serverId, onFirstImage) {
+        function fillRow(row, sizes, section, items, serverId, onFirstImage, inert) {
             var strip = el('div', 'em-strip');
-            for (var i = 0; i < items.length; i++) {
-                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null));
+            // The loading screen draws only what fits across the screen.
+            var count = inert ? Math.min(items.length, Math.ceil(win.innerWidth / (cardSize(sizes, section)[0] + sizes.gap))) : items.length;
+            for (var i = 0; i < count; i++) {
+                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null, inert));
             }
             row.appendChild(strip);
         }
 
-        function rowFor(sizes, section, serverId, onFirstImage) {
+        function rowFor(sizes, section, serverId, onFirstImage, inert) {
             var row = el('section', 'em-row');
             row.setAttribute('data-section', section.Id);
             row.style.paddingLeft = px(sizes.pad);
@@ -583,7 +594,7 @@
                 return row;
             }
             row.style.height = px(rowHeight(sizes, section));
-            fillRow(row, sizes, section, section.Items.Items, serverId, onFirstImage);
+            fillRow(row, sizes, section, section.Items.Items, serverId, onFirstImage, inert);
             return row;
         }
 
@@ -624,8 +635,11 @@
             }
         }
 
-        function feature(sizes, section, serverId, layout) {
+        // preview: drawn for the loading screen, still and inert; preview.onArt runs once its backdrop shows.
+        function feature(sizes, section, serverId, layout, preview) {
             var items = section.Items.Items;
+            var tag = preview ? 'div' : 'button';
+            var focusable = preview ? '' : ' em-focusable focusable';
             var box = el('section', 'em-feature');
             box.setAttribute('data-section', section.Id);
             box.style.height = px(sizes.feature);
@@ -637,12 +651,12 @@
             box.appendChild(info);
 
             var buttons = el('div', 'em-feature-buttons');
-            var play = el('button', 'em-button em-primary em-focusable focusable', 'Play');
-            var more = el('button', 'em-button em-focusable focusable', 'More info');
-            var favourite = el('button', 'em-button em-icon em-focusable focusable');
+            var play = el(tag, 'em-button em-primary' + focusable, 'Play');
+            var more = el(tag, 'em-button' + focusable, 'More info');
+            var favourite = el(tag, 'em-button em-icon' + focusable);
             var all = [play, more, favourite];
             for (var b = 0; b < all.length; b++) {
-                all[b].type = 'button';
+                if (!preview) all[b].type = 'button';
                 all[b].style.fontSize = px(sizes.button[0]);
                 all[b].style.height = px(sizes.button[1]);
             }
@@ -661,8 +675,8 @@
             }
             var pause = null;
             if (layout !== 'tv' && items.length > 1) {
-                pause = el('button', 'em-pause em-focusable focusable');
-                pause.type = 'button';
+                pause = el(tag, 'em-pause' + focusable);
+                if (!preview) pause.type = 'button';
                 pause.setAttribute('aria-label', 'Pause');
                 dots.appendChild(pause);
             }
@@ -684,12 +698,9 @@
                 art.innerHTML = '';
                 if (backdrop) {
                     paintBlurHash(art, blurHashOf(item, ['Backdrop', backdrop]));
-                    image(art, imageUrl(base, item.Id, 'Backdrop', backdrop, Math.min(win.innerWidth, 1920), win.devicePixelRatio), function () {
-                        if (!heroMarked) { heroMarked = true; mark('em-hero'); }
-                    });
-                } else if (!heroMarked) {
-                    heroMarked = true;
-                    mark('em-hero');
+                    image(art, imageUrl(base, item.Id, 'Backdrop', backdrop, Math.min(win.innerWidth, 1920), win.devicePixelRatio), heroShown);
+                } else {
+                    heroShown();
                 }
                 // the next slide's backdrop, so rotation shows it at once
                 var next = items[(index + 1) % items.length];
@@ -721,10 +732,22 @@
                 progress();
             }
 
+            function heroShown() {
+                if (heroMarked) return;
+                heroMarked = true;
+                if (preview) preview.onArt();
+                else mark('em-hero');
+            }
+
             function progress() {
                 var on = dotEls[index];
                 if (on) on.firstChild.style.width = Math.min(100, rotation.elapsed / ROTATE_MS * 100) + '%';
             }
+
+            show(0);
+            box.emPlay = play;
+            box.emMore = more;
+            if (preview) return box;
 
             play.addEventListener('click', function () { playItem(items[index], serverId); });
             more.addEventListener('click', function () { win.location.hash = detailsHash(items[index].Id, serverId); });
@@ -763,9 +786,6 @@
                 }, 100);
                 state.rotation = rotation;
             }
-            show(0);
-            box.emMore = more;
-            box.emPlay = play;
             return box;
         }
 
@@ -870,9 +890,19 @@
                     return;
                 }
                 if (doc.activeElement !== target) target.focus();
+                keepTop(target);
                 win.setTimeout(hold, 50);
             };
             hold();
+        }
+
+        // jellyfin-web scrolls to what it focuses as a page shows. Home opens at its top, hero in view,
+        // whenever the landing place, with its ring, fits on the screen from there.
+        function keepTop(target) {
+            var scroller = doc.scrollingElement || doc.documentElement;
+            if (!scroller.scrollTop) return;
+            var art = target.querySelector('.em-card-art') || target;
+            if (art.getBoundingClientRect().bottom + scroller.scrollTop + 12 <= win.innerHeight) win.scrollTo(0, 0);
         }
 
         function homeVisible() {
@@ -883,10 +913,17 @@
         }
 
         // --- the loading screen ----------------------------------------------------------------
-        // When the app starts on Home, jellyfin-web takes a while to draw its page, and until then
-        // there is nowhere to put placeholders. A loading screen shaped like Home covers that time and
-        // fades into the drawn page. It never hides anything else: leaving Home, a dialog, a fallback
-        // or 10 s ends it.
+        // When the app starts on Home, jellyfin-web takes a while to draw its page. The page call,
+        // started with this script, is usually back long before, so the loading screen draws Home
+        // itself, still and inert, and hands over to the live page once jellyfin-web has drawn it:
+        //  - the first 250 ms show only the background, so a quick start never looks like loading;
+        //  - then placeholders shaped like Home under one soft sweep of light, until the data is back;
+        //  - with the data, the real hero and the rows that fit on the screen;
+        //  - after 2.5 s, a status line whose bar moves only on real steps: connected, artwork shown,
+        //    handing over; after 8 s it says the server is slow;
+        //  - once the live page is drawn and its hero image shows, a crossfade.
+        // It covers jellyfin-web's own splash and spinner, and never anything else: leaving Home, a
+        // dialog, a failed page call or 20 s ends it.
 
         function onHomeRoute() {
             var hash = win.location.hash;
@@ -906,14 +943,86 @@
             return /Mobi|Android/i.test(browser) ? 'phone' : 'web';
         }
 
-        function fillBoot(boot, layout) {
+        function addClass(e, name) {
+            if ((' ' + e.className + ' ').indexOf(' ' + name + ' ') < 0) e.className += ' ' + name;
+        }
+
+        // Home as the page call describes it, down to the bottom of the screen, with nothing to focus.
+        function previewPage(boot, sizes, layout, page) {
+            var cred = credentials();
+            var serverId = cred ? cred.Id : null;
+            var frame = el('div', 'em-page');
+            var sections = page.Sections || [];
+            var height = 0;
+            for (var i = 0; i < sections.length && height < win.innerHeight; i++) {
+                var section = sections[i];
+                if (section.Kind !== 'items') continue;
+                if (section.Display.Hint === 'feature') {
+                    if (section.Items && section.Items.Items.length) {
+                        frame.appendChild(feature(sizes, section, serverId, layout, { onArt: function () { bootStep(boot, 3); } }));
+                        height += sizes.feature;
+                    }
+                    continue;
+                }
+                if (section.Items && !section.Items.Items.length) continue;
+                frame.appendChild(section.Items || section.Error
+                    ? rowFor(sizes, section, serverId, null, true)
+                    : placeholderRow(sizes, section, section.Title));
+                height += rowHeight(sizes, section);
+            }
+            return frame;
+        }
+
+        function drawBoot(boot) {
+            var layout = bootLayout();
             var sizes = SIZES[layout];
+            var layer = boot.emLayer;
             boot.emLayout = layout;
-            boot.className = 'em-boot em-home em-' + layout;
-            boot.style.setProperty('--em-room', px(sizes.room));
-            boot.style.paddingTop = px(BOOT_TOP[layout]);
-            boot.innerHTML = '';
-            boot.appendChild(skeleton(sizes));
+            boot.emStatus.style.fontSize = px(sizes.captionSize[0]);
+            layer.className = 'em-boot-page em-home em-' + layout;
+            layer.style.setProperty('--em-ring', px(sizes.ring));
+            layer.style.setProperty('--em-room', px(sizes.room));
+            layer.style.top = px(boot.emTop || BOOT_TOP[layout]);
+            layer.innerHTML = '';
+            layer.appendChild(boot.emPage ? previewPage(boot, sizes, layout, boot.emPage) : skeleton(sizes));
+            // Real content shows at once; placeholders wait out the quiet moment.
+            if (boot.emPage) addClass(boot, 'em-boot-shown');
+        }
+
+        var BOOT_STEPS = [0, 0.15, 0.55, 0.8, 1];
+
+        function bootStep(boot, step) {
+            if (step <= boot.emStep) return;
+            boot.emStep = step;
+            boot.emFill.style.transform = 'scaleX(' + BOOT_STEPS[step] + ')';
+            bootLabel(boot);
+        }
+
+        function bootLabel(boot) {
+            var cred = credentials();
+            var server = cred && cred.Name ? cred.Name : 'your server';
+            boot.emLabel.textContent = Date.now() - boot.emStarted > BOOT_SLOW_MS
+                ? 'Still starting. ' + server + ' is taking longer than usual.'
+                : boot.emStep < 2 ? 'Connecting to ' + server + '…' : 'Getting your home screen ready…';
+        }
+
+        function tickBoot(boot) {
+            var elapsed = Date.now() - boot.emStarted;
+            if (!onHomeRoute() || doc.querySelector('.dialogContainer .dialog') || elapsed > BOOT_MS) {
+                hideBoot(false);
+                return;
+            }
+            if (elapsed >= BOOT_QUIET_MS) addClass(boot, 'em-boot-shown');
+            if (elapsed >= BOOT_STATUS_MS) addClass(boot, 'em-boot-status-on');
+            if (elapsed >= BOOT_SLOW_MS) bootLabel(boot);
+            if (bootLayout() !== boot.emLayout) drawBoot(boot);
+            // Lines up with jellyfin-web's page as soon as it is there.
+            var page = state.root && state.root.parentNode ? state.root : homeVisible();
+            var top = page ? Math.round(page.getBoundingClientRect().top) : 0;
+            if (top > 0 && top !== boot.emTop) {
+                boot.emTop = top;
+                boot.emLayer.style.top = px(top);
+            }
         }
 
         function showBoot() {
@@ -923,38 +1032,65 @@
                 return;
             }
             if (homeVisible()) return;
-            var boot = el('div');
+            var boot = el('div', 'em-boot');
             boot.id = 'em-boot';
-            boot.setAttribute('aria-hidden', 'true');
-            fillBoot(boot, bootLayout());
+            var layer = el('div', 'em-boot-page');
+            layer.setAttribute('aria-hidden', 'true');
+            var status = el('div', 'em-boot-status');
+            status.setAttribute('role', 'status');
+            var label = el('div', 'em-boot-label');
+            var bar = el('div', 'em-boot-bar');
+            var fill = el('div');
+            bar.appendChild(fill);
+            status.appendChild(label);
+            status.appendChild(bar);
+            boot.appendChild(layer);
+            boot.appendChild(status);
+            boot.emLayer = layer;
+            boot.emStatus = status;
+            boot.emLabel = label;
+            boot.emFill = fill;
+            boot.emStarted = Date.now();
+            boot.emStep = 0;
+            drawBoot(boot);
+            bootStep(boot, 1);
             doc.body.appendChild(boot);
+            doc.documentElement.classList.add('em-booting');
             state.boot = boot;
-            var started = Date.now();
-            boot.emTimer = win.setInterval(function () {
-                if (!onHomeRoute() || doc.querySelector('.dialogContainer .dialog') || Date.now() - started > BOOT_MS) {
-                    hideBoot(false);
-                    return;
-                }
-                var layout = bootLayout();
-                if (layout !== boot.emLayout) fillBoot(boot, layout);
-            }, 100);
+            loadPage().then(function (page) {
+                if (state.boot !== boot) return;
+                boot.emPage = page;
+                bootStep(boot, 2);
+                drawBoot(boot);
+            }, function () { hideBoot(false); });
+            boot.emTimer = win.setInterval(function () { tickBoot(boot); }, 100);
         }
 
+        // fade: hand over to the drawn page once its hero image shows (600 ms at most), so both sides
+        // of the crossfade show the same picture. Otherwise the loading screen just goes.
         function hideBoot(fade) {
             var boot = state.boot;
             if (!boot) return;
             state.boot = null;
             win.clearInterval(boot.emTimer);
-            var gone = function () { if (boot.parentNode) boot.parentNode.removeChild(boot); };
+            var gone = function () {
+                if (boot.parentNode) boot.parentNode.removeChild(boot);
+                if (!state.boot) doc.documentElement.classList.remove('em-booting');
+            };
             if (!fade) {
                 gone();
                 return;
             }
-            // The placeholders line up with the drawn page as it shows through.
-            var top = state.root && state.root.parentNode ? state.root.getBoundingClientRect().top : 0;
-            if (top > 0) boot.style.paddingTop = px(top);
-            boot.className += ' em-boot-out';
-            win.setTimeout(gone, 300);
+            bootStep(boot, 4);
+            var waited = 0;
+            var wait = win.setInterval(function () {
+                waited += 50;
+                var hero = state.root && state.root.querySelector('.em-feature .em-img');
+                if (waited < 600 && hero && hero.className.indexOf('em-loaded') < 0) return;
+                win.clearInterval(wait);
+                addClass(boot, 'em-boot-out');
+                win.setTimeout(gone, 350);
+            }, 50);
         }
 
         // --- Up and Down into the hero ---------------------------------------------------------
