@@ -36,6 +36,10 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
+      # The smoke test checks the API against docs/api/openapi.json with a Node script.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
       - run: bash scripts/smoke-test.sh
 
   # Packages the plugin with its checksum and installs it from a local plugin

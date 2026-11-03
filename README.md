@@ -17,6 +17,8 @@ Experience Manager's home screen reads from a public API that other clients can 
 
 Items are Jellyfin's own `BaseItemDto`, and the API takes Jellyfin's `fields`, `enableImageTypes`, `imageTypeLimit` and `enableUserData` parameters. The API is early and may still change before the first release.
 
+Client authors: the [integration guide](docs/api/README.md) goes from discovery to a drawn home page, and [docs/api/openapi.json](docs/api/openapi.json) is the full contract. Both are MIT licensed.
+
 ## Requirements
 
 - Jellyfin 12.0 or later. The build targets 12.2.
@@ -29,12 +31,13 @@ You need the .NET 10 SDK, Node.js 22 or later, and bash.
 ```bash
 dotnet test                            # builds the plugin and runs its tests
 node --test "tests/home/*.test.js"     # home client tests
+node --test "tests/api/*.test.mjs"     # API contract tests
 bash scripts/check-community-files.sh  # community files
 bash scripts/coverage.sh               # both test suites, with a coverage summary
 ```
 
 These also need Docker. CI runs them on every pull request.
-- `bash scripts/smoke-test.sh` loads the plugin into a real Jellyfin server and checks what it reports and serves. That covers the plugin active with its image, its admin page in the Dashboard sidebar, and the home client added to jellyfin-web's page. The page checks also run alongside File Transformation and under a BaseUrl.
+- `bash scripts/smoke-test.sh` loads the plugin into a real Jellyfin server and checks what it reports and serves. That covers the plugin active with its image, its admin page in the Dashboard sidebar, the home client added to jellyfin-web's page, and the home API matching docs/api/openapi.json. After changing the API, run it with `UPDATE_API_SCHEMA=1` to regenerate the contract. The page checks also run alongside File Transformation and under a BaseUrl.
 - `bash scripts/repo-install-check.sh` installs the plugin the way an admin does, from a plugin repository served from a local container. With `--upgrade`, it then upgrades to a newer version from the same repository.
 
 ## Questions, contributing and security
