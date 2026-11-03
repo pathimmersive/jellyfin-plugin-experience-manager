@@ -13,7 +13,7 @@ For a bug, use the bug report form. Include the Jellyfin server version, the Exp
 ## Making a change
 
 1. Fork the repository and branch from `main`, naming the branch `<type>/<short-name>`, for example `fix/hero-focus`.
-2. Build and test as the [README](README.md#building-and-testing) describes. A change should pass `dotnet test`, `bash scripts/check-community-files.sh` and, for server changes, `bash scripts/smoke-test.sh`.
+2. Build and test as the [README](README.md#building-and-testing) describes. A change should pass `dotnet test`, the home client tests, `bash scripts/check-community-files.sh` and, for server changes, `bash scripts/smoke-test.sh`.
    - A change to packaging should also pass `bash scripts/repo-install-check.sh` and `bash scripts/repo-install-check.sh --upgrade`.
    - Note anything checked by hand, with the client, device and Jellyfin version.
    - `bash scripts/coverage.sh` runs the tests and prints their coverage, as CI does. A new behaviour should come with a test, but no coverage percentage fails a build.
@@ -21,6 +21,8 @@ For a bug, use the bug report form. Include the Jellyfin server version, the Exp
 4. Fill in the pull request template: what changed and why, and how it was checked. Link a related issue with `Fixes #N`.
 5. For a change users would notice, add a line under **Unreleased** in [CHANGELOG.md](CHANGELOG.md), in the section that fits (Added, Changed, Fixed, Removed, Security).
 6. CI must pass before the change can merge. Pull requests are squash-merged into one commit on `main`, so give their commits Conventional Commits messages too.
+
+The home client in `src/home` is plain ES5 with no build step, because the oldest TVs in use run Chromium 68. Keep it that way; its tests check for newer language and browser features.
 
 ## Releases
 

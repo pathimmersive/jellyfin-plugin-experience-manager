@@ -44,8 +44,8 @@ public interface IHomePage
 }
 
 /// <summary>
-/// The Home page until layouts can be edited: featured, Continue Watching, Next Up, then Latest for
-/// each movie and show library the user can see, in the user's library order.
+/// The Home page until layouts can be edited: featured, My Media, Continue Watching, Next Up, then
+/// Latest for each movie and show library the user can see, in the user's library order.
 /// </summary>
 public sealed class FixedHomePage : IHomePage
 {
@@ -82,9 +82,11 @@ public sealed class FixedHomePage : IHomePage
     /// <inheritdoc />
     public IReadOnlyList<PageSection> SectionsFor(User user)
     {
+        var views = _sources.GetViews(user);
         var sections = new List<PageSection>
         {
             new("featured", "Featured", new SectionDisplay("feature", "landscape"), null, FeaturedCount, u => Featured(u)),
+            new("mymedia", "My Media", new SectionDisplay("row", "landscape"), null, RowCount, _ => (views.Select(v => v.Item).OfType<BaseItem>().ToList(), true)),
             new(
                 "continue",
                 "Continue Watching",
@@ -95,7 +97,7 @@ public sealed class FixedHomePage : IHomePage
             new("nextup", "Next Up", new SectionDisplay("row", "landscape"), null, RowCount, u => Visible(u, _cache.NextUp(u, out var hit), hit)),
         };
 
-        foreach (var view in _sources.GetViews(user).Where(v => v.Type is CollectionType.movies or CollectionType.tvshows))
+        foreach (var view in views.Where(v => v.Type is CollectionType.movies or CollectionType.tvshows))
         {
             var shows = view.Type == CollectionType.tvshows;
             sections.Add(new PageSection(

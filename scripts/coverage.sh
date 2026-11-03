@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Runs the plugin tests with coverage and prints a summary. It reports coverage;
-# it does not fail on a percentage. It fails if a test fails or the report is missing.
+# Runs the plugin and home client tests with coverage and prints a summary of each.
+# It reports coverage; it does not fail on a percentage. It fails if a test fails or a
+# report is missing.
 #
 # Usage: scripts/coverage.sh
 #
-# Needs: bash, the .NET 10 SDK.
+# Needs: bash, the .NET 10 SDK, Node.js 22 or later.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,6 +24,12 @@ package="$(grep -o '<package [^>]*name="Jellyfin.Plugin.ExperienceManager"[^>]*>
 [ -n "$package" ] || fail "the coverage report has no Jellyfin.Plugin.ExperienceManager package"
 rate() { echo "$package" | sed -E "s/.* $1=\"([0-9.]+)\".*/\1/" | awk '{ printf "%.1f%%", $1 * 100 }'; }
 
+node --test --experimental-test-coverage "tests/home/*.test.js" | tee "$out/home.txt"
+client="$(grep -E '^.{0,4}[[:space:]]*home\.js[[:space:]]*\|' "$out/home.txt" || true)"
+[ -n "$client" ] || fail "the home client coverage report does not include home.js"
+column() { echo "$client" | awk -F'|' -v n="$1" '{ gsub(/ /, "", $n); print $n "%" }'; }
+
 echo
 echo "Coverage"
 echo "  plugin   lines $(rate line-rate), branches $(rate branch-rate)"
+echo "  client   lines $(column 2), branches $(column 3), functions $(column 4)"

@@ -15,7 +15,8 @@ namespace Jellyfin.Plugin.ExperienceManager.Home;
 /// <param name="Id">The library's id.</param>
 /// <param name="Name">The library's name.</param>
 /// <param name="Type">What it holds.</param>
-public sealed record LibraryView(Guid Id, string Name, CollectionType? Type);
+/// <param name="Item">The library's own folder, for drawing it as a tile.</param>
+public sealed record LibraryView(Guid Id, string Name, CollectionType? Type, BaseItem? Item = null);
 
 /// <summary>
 /// What the home page needs to know about a user that only the server can answer.
@@ -58,7 +59,7 @@ public sealed class JellyfinHomeSources : IHomeSources
     /// <inheritdoc />
     public IReadOnlyList<LibraryView> GetViews(User user) =>
         _views.GetUserViews(new UserViewQuery { User = user })
-            .Select(v => new LibraryView(v.Id, v.Name, (v as ICollectionFolder)?.CollectionType))
+            .Select(v => new LibraryView(v.Id, v.Name, (v as ICollectionFolder)?.CollectionType, v))
             .ToList();
 
     /// <inheritdoc />
