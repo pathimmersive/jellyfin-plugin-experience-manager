@@ -6,7 +6,7 @@ Experience Manager is a Jellyfin server plugin that gives server admins control 
 
 ## Status
 
-Early development; there is no release yet and the plugin does nothing useful so far. It builds, installs, and adds an empty admin page with its own entry in the Dashboard sidebar.
+Early development; there is no release yet. The plugin draws a first version of its home screen in jellyfin-web, from a fixed layout: a featured banner, My Media, Continue Watching, Next Up and Latest. Its admin page is still empty, so nothing can be configured yet.
 
 ## Home API
 
@@ -24,12 +24,13 @@ Items are Jellyfin's own `BaseItemDto`, and the API takes Jellyfin's `fields`, `
 
 ## Building and testing
 
-You need the .NET 10 SDK and bash.
+You need the .NET 10 SDK, Node.js 22 or later, and bash.
 
 ```bash
 dotnet test                            # builds the plugin and runs its tests
+node --test "tests/home/*.test.js"     # home client tests
 bash scripts/check-community-files.sh  # community files
-bash scripts/coverage.sh               # the tests, with a coverage summary
+bash scripts/coverage.sh               # both test suites, with a coverage summary
 ```
 
 These also need Docker. CI runs them on every pull request.

@@ -138,11 +138,27 @@ public class FixedHomePageTests
         var sections = Page(out var cache).SectionsFor(Viewer);
         using (cache)
         {
-            Assert.Equal(["featured", "continue", "nextup", "latest-" + films.ToString("N"), "latest-" + shows.ToString("N")], sections.Select(s => s.Id));
+            Assert.Equal(["featured", "mymedia", "continue", "nextup", "latest-" + films.ToString("N"), "latest-" + shows.ToString("N")], sections.Select(s => s.Id));
             Assert.Equal("feature", sections[0].Display.Hint);
-            Assert.Equal("Latest Shows", sections[4].Title);
-            Assert.Equal("Series", sections[4].SeeAll!.IncludeItemTypes);
-            Assert.Equal(films.ToString("N"), sections[3].SeeAll!.ParentId);
+            Assert.Equal("Latest Shows", sections[5].Title);
+            Assert.Equal("Series", sections[5].SeeAll!.IncludeItemTypes);
+            Assert.Equal(films.ToString("N"), sections[4].SeeAll!.ParentId);
+        }
+    }
+
+    [Fact]
+    public void MyMediaIsTheUsersLibrariesInTheirOwnOrder()
+    {
+        var (shows, films) = (new Folder { Id = Guid.NewGuid(), Name = "Shows" }, new Folder { Id = Guid.NewGuid(), Name = "Movies" });
+        _sources.GetViews(Viewer).Returns([new LibraryView(shows.Id, "Shows", CollectionType.tvshows, shows), new LibraryView(films.Id, "Movies", CollectionType.movies, films)]);
+
+        var sections = Page(out var cache).SectionsFor(Viewer);
+        using (cache)
+        {
+            var myMedia = sections.Single(s => s.Id == "mymedia");
+            Assert.Equal(1, sections.ToList().IndexOf(myMedia));
+            Assert.Equal([shows, films], myMedia.Load(Viewer).Items);
+            Assert.Equal("landscape", myMedia.Display.Shape);
         }
     }
 
