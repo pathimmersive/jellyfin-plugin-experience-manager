@@ -17,8 +17,7 @@
     var INLINE_SECTIONS = 4;
     var FALLBACK_FLAG = 'em-home-fallback';
     var BOOT_QUIET_MS = 250;
-    var BOOT_STATUS_MS = 2500;
-    var BOOT_SLOW_MS = 8000;
+    var BOOT_READY_MS = 2000;
     var BOOT_MS = 20000;
     // Where jellyfin-web puts Home's top edge, per layout, until the page is there to measure.
     var BOOT_TOP = { tv: 134, web: 48, phone: 48 };
@@ -536,12 +535,11 @@
             return box;
         }
 
-        // inert: drawn for the loading screen, neither a link nor focusable.
-        function card(sizes, section, item, serverId, onImage, inert) {
+        function card(sizes, section, item, serverId, onImage) {
             var size = cardSize(sizes, section);
             var shape = section.Id === 'mymedia' ? 'landscape' : section.Display.Shape;
-            var link = el(inert ? 'div' : 'a', inert ? 'em-card' : 'em-card em-focusable focusable');
-            if (!inert) link.href = section.Id === 'mymedia' ? libraryHash(item, serverId) : detailsHash(item.Id, serverId);
+            var link = el('a', 'em-card em-focusable focusable');
+            link.href = section.Id === 'mymedia' ? libraryHash(item, serverId) : detailsHash(item.Id, serverId);
             link.style.width = px(size[0]);
             link.style.marginRight = px(sizes.gap);
             var art = el('div', 'em-card-art');
@@ -574,17 +572,15 @@
             return link;
         }
 
-        function fillRow(row, sizes, section, items, serverId, onFirstImage, inert) {
+        function fillRow(row, sizes, section, items, serverId, onFirstImage) {
             var strip = el('div', 'em-strip');
-            // The loading screen draws only what fits across the screen.
-            var count = inert ? Math.min(items.length, Math.ceil(win.innerWidth / (cardSize(sizes, section)[0] + sizes.gap))) : items.length;
-            for (var i = 0; i < count; i++) {
-                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null, inert));
+            for (var i = 0; i < items.length; i++) {
+                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null));
             }
             row.appendChild(strip);
         }
 
-        function rowFor(sizes, section, serverId, onFirstImage, inert) {
+        function rowFor(sizes, section, serverId, onFirstImage) {
             var row = el('section', 'em-row');
             row.setAttribute('data-section', section.Id);
             row.style.paddingLeft = px(sizes.pad);
@@ -594,7 +590,7 @@
                 return row;
             }
             row.style.height = px(rowHeight(sizes, section));
-            fillRow(row, sizes, section, section.Items.Items, serverId, onFirstImage, inert);
+            fillRow(row, sizes, section, section.Items.Items, serverId, onFirstImage);
             return row;
         }
 
@@ -635,11 +631,8 @@
             }
         }
 
-        // preview: drawn for the loading screen, still and inert; preview.onArt runs once its backdrop shows.
-        function feature(sizes, section, serverId, layout, preview) {
+        function feature(sizes, section, serverId, layout) {
             var items = section.Items.Items;
-            var tag = preview ? 'div' : 'button';
-            var focusable = preview ? '' : ' em-focusable focusable';
             var box = el('section', 'em-feature');
             box.setAttribute('data-section', section.Id);
             box.style.height = px(sizes.feature);
@@ -651,12 +644,12 @@
             box.appendChild(info);
 
             var buttons = el('div', 'em-feature-buttons');
-            var play = el(tag, 'em-button em-primary' + focusable, 'Play');
-            var more = el(tag, 'em-button' + focusable, 'More info');
-            var favourite = el(tag, 'em-button em-icon' + focusable);
+            var play = el('button', 'em-button em-primary em-focusable focusable', 'Play');
+            var more = el('button', 'em-button em-focusable focusable', 'More info');
+            var favourite = el('button', 'em-button em-icon em-focusable focusable');
             var all = [play, more, favourite];
             for (var b = 0; b < all.length; b++) {
-                if (!preview) all[b].type = 'button';
+                all[b].type = 'button';
                 all[b].style.fontSize = px(sizes.button[0]);
                 all[b].style.height = px(sizes.button[1]);
             }
@@ -675,8 +668,8 @@
             }
             var pause = null;
             if (layout !== 'tv' && items.length > 1) {
-                pause = el(tag, 'em-pause' + focusable);
-                if (!preview) pause.type = 'button';
+                pause = el('button', 'em-pause em-focusable focusable');
+                pause.type = 'button';
                 pause.setAttribute('aria-label', 'Pause');
                 dots.appendChild(pause);
             }
@@ -735,8 +728,7 @@
             function heroShown() {
                 if (heroMarked) return;
                 heroMarked = true;
-                if (preview) preview.onArt();
-                else mark('em-hero');
+                mark('em-hero');
             }
 
             function progress() {
@@ -747,7 +739,6 @@
             show(0);
             box.emPlay = play;
             box.emMore = more;
-            if (preview) return box;
 
             play.addEventListener('click', function () { playItem(items[index], serverId); });
             more.addEventListener('click', function () { win.location.hash = detailsHash(items[index].Id, serverId); });
@@ -913,17 +904,15 @@
         }
 
         // --- the loading screen ----------------------------------------------------------------
-        // When the app starts on Home, jellyfin-web takes a while to draw its page. The page call,
-        // started with this script, is usually back long before, so the loading screen draws Home
-        // itself, still and inert, and hands over to the live page once jellyfin-web has drawn it:
+        // When the app starts on Home, jellyfin-web takes a while to draw its page, longest on an older
+        // TV. The loading screen covers that time, jellyfin-web's splash and spinner included, and
+        // shows Home once, complete:
         //  - the first 250 ms show only the background, so a quick start never looks like loading;
-        //  - then placeholders shaped like Home under one soft sweep of light, until the data is back;
-        //  - with the data, the real hero and the rows that fit on the screen;
-        //  - after 2.5 s, a status line whose bar moves only on real steps: connected, artwork shown,
-        //    handing over; after 8 s it says the server is slow;
-        //  - once the live page is drawn and its hero image shows, a crossfade.
-        // It covers jellyfin-web's own splash and spinner, and never anything else: leaving Home, a
-        // dialog, a failed page call or 20 s ends it.
+        //  - then placeholders shaped like Home under one soft sweep of light, and nothing else;
+        //  - meanwhile, as soon as the page call answers, the first screen's artwork downloads;
+        //  - once the live page is drawn beneath, lined up, its first screen's images decoded and its
+        //    fonts loaded (2 s at most), one crossfade into it.
+        // It never hides anything else: leaving Home, a dialog, a failed page call or 20 s ends it.
 
         function onHomeRoute() {
             var hash = win.location.hash;
@@ -947,30 +936,34 @@
             if ((' ' + e.className + ' ').indexOf(' ' + name + ' ') < 0) e.className += ' ' + name;
         }
 
-        // Home as the page call describes it, down to the bottom of the screen, with nothing to focus.
-        function previewPage(boot, sizes, layout, page) {
-            var cred = credentials();
-            var serverId = cred ? cred.Id : null;
-            var frame = el('div', 'em-page');
+        // The images the live page will ask for on its first screen, at the same addresses, so they
+        // come from the browser's cache when it draws.
+        function preloadFirstScreen(page, sizes) {
             var sections = page.Sections || [];
-            var height = 0;
+            var height = BOOT_TOP[bootLayout()];
+            var width = Math.min(win.innerWidth, 1920);
+            var urls = [];
             for (var i = 0; i < sections.length && height < win.innerHeight; i++) {
                 var section = sections[i];
-                if (section.Kind !== 'items') continue;
+                if (section.Kind !== 'items' || !section.Items || !section.Items.Items.length) continue;
+                var items = section.Items.Items;
                 if (section.Display.Hint === 'feature') {
-                    if (section.Items && section.Items.Items.length) {
-                        frame.appendChild(feature(sizes, section, serverId, layout, { onArt: function () { bootStep(boot, 3); } }));
-                        height += sizes.feature;
-                    }
+                    var first = items[0];
+                    if ((first.BackdropImageTags || [])[0]) urls.push(imageUrl(base, first.Id, 'Backdrop', first.BackdropImageTags[0], width, win.devicePixelRatio));
+                    if (first.ImageTags && first.ImageTags.Logo) urls.push(imageUrl(base, first.Id, 'Logo', first.ImageTags.Logo, sizes.logo * 6, win.devicePixelRatio));
+                    height += sizes.feature;
                     continue;
                 }
-                if (section.Items && !section.Items.Items.length) continue;
-                frame.appendChild(section.Items || section.Error
-                    ? rowFor(sizes, section, serverId, null, true)
-                    : placeholderRow(sizes, section, section.Title));
+                var size = cardSize(sizes, section);
+                var shape = section.Id === 'mymedia' ? 'landscape' : section.Display.Shape;
+                var across = Math.min(items.length, Math.ceil(win.innerWidth / (size[0] + sizes.gap)));
+                for (var k = 0; k < across; k++) {
+                    var picked = cardImage(items[k], shape);
+                    if (picked) urls.push(imageUrl(base, picked[2], picked[0], picked[1], size[0], win.devicePixelRatio));
+                }
                 height += rowHeight(sizes, section);
             }
-            return frame;
+            for (var u = 0; u < urls.length; u++) new win.Image().src = urls[u];
         }
 
         function drawBoot(boot) {
@@ -978,32 +971,11 @@
             var sizes = SIZES[layout];
             var layer = boot.emLayer;
             boot.emLayout = layout;
-            boot.emStatus.style.fontSize = px(sizes.captionSize[0]);
             layer.className = 'em-boot-page em-home em-' + layout;
-            layer.style.setProperty('--em-ring', px(sizes.ring));
             layer.style.setProperty('--em-room', px(sizes.room));
             layer.style.top = px(boot.emTop || BOOT_TOP[layout]);
             layer.innerHTML = '';
-            layer.appendChild(boot.emPage ? previewPage(boot, sizes, layout, boot.emPage) : skeleton(sizes));
-            // Real content shows at once; placeholders wait out the quiet moment.
-            if (boot.emPage) addClass(boot, 'em-boot-shown');
-        }
-
-        var BOOT_STEPS = [0, 0.15, 0.55, 0.8, 1];
-
-        function bootStep(boot, step) {
-            if (step <= boot.emStep) return;
-            boot.emStep = step;
-            boot.emFill.style.transform = 'scaleX(' + BOOT_STEPS[step] + ')';
-            bootLabel(boot);
-        }
-
-        function bootLabel(boot) {
-            var cred = credentials();
-            var server = cred && cred.Name ? cred.Name : 'your server';
-            boot.emLabel.textContent = Date.now() - boot.emStarted > BOOT_SLOW_MS
-                ? 'Still starting. ' + server + ' is taking longer than usual.'
-                : boot.emStep < 2 ? 'Connecting to ' + server + '…' : 'Getting your home screen ready…';
+            layer.appendChild(skeleton(sizes));
         }
 
         function tickBoot(boot) {
@@ -1013,8 +985,6 @@
                 return;
             }
             if (elapsed >= BOOT_QUIET_MS) addClass(boot, 'em-boot-shown');
-            if (elapsed >= BOOT_STATUS_MS) addClass(boot, 'em-boot-status-on');
-            if (elapsed >= BOOT_SLOW_MS) bootLabel(boot);
             if (bootLayout() !== boot.emLayout) drawBoot(boot);
             // Lines up with jellyfin-web's page as soon as it is there.
             var page = state.root && state.root.parentNode ? state.root : homeVisible();
@@ -1034,40 +1004,44 @@
             if (homeVisible()) return;
             var boot = el('div', 'em-boot');
             boot.id = 'em-boot';
+            boot.setAttribute('aria-hidden', 'true');
             var layer = el('div', 'em-boot-page');
-            layer.setAttribute('aria-hidden', 'true');
-            var status = el('div', 'em-boot-status');
-            status.setAttribute('role', 'status');
-            var label = el('div', 'em-boot-label');
-            var bar = el('div', 'em-boot-bar');
-            var fill = el('div');
-            bar.appendChild(fill);
-            status.appendChild(label);
-            status.appendChild(bar);
             boot.appendChild(layer);
-            boot.appendChild(status);
             boot.emLayer = layer;
-            boot.emStatus = status;
-            boot.emLabel = label;
-            boot.emFill = fill;
             boot.emStarted = Date.now();
-            boot.emStep = 0;
             drawBoot(boot);
-            bootStep(boot, 1);
             doc.body.appendChild(boot);
             doc.documentElement.classList.add('em-booting');
             state.boot = boot;
             loadPage().then(function (page) {
-                if (state.boot !== boot) return;
-                boot.emPage = page;
-                bootStep(boot, 2);
-                drawBoot(boot);
+                if (state.boot === boot) preloadFirstScreen(page, SIZES[bootLayout()]);
             }, function () { hideBoot(false); });
             boot.emTimer = win.setInterval(function () { tickBoot(boot); }, 100);
         }
 
-        // fade: hand over to the drawn page once its hero image shows (600 ms at most), so both sides
-        // of the crossfade show the same picture. Otherwise the loading screen just goes.
+        // Ready to show: the first screen's images decoded and its text's fonts loaded.
+        function firstScreenReady(root) {
+            var waits = [];
+            var settle = function (p) { return p.then(function () { }, function () { }); };
+            var images = root.querySelectorAll('.em-img');
+            for (var i = 0; i < images.length; i++) {
+                var img = images[i];
+                if (img.getBoundingClientRect().top >= win.innerHeight) continue;
+                if (img.decode) waits.push(settle(img.decode()));
+                else if (!img.complete) waits.push(new Promise(function (done) { img.addEventListener('load', done); img.addEventListener('error', done); }));
+            }
+            if (doc.fonts && doc.fonts.load) {
+                var texts = root.querySelectorAll('.em-row-title, .em-caption-1, .em-meta');
+                for (var t = 0; t < texts.length && t < 3; t++) {
+                    var style = win.getComputedStyle(texts[t]);
+                    waits.push(settle(doc.fonts.load(style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily)));
+                }
+            }
+            return Promise.all(waits);
+        }
+
+        // fade: hand over to the drawn page once its first screen is ready (2 s at most); otherwise
+        // the loading screen just goes.
         function hideBoot(fade) {
             var boot = state.boot;
             if (!boot) return;
@@ -1077,20 +1051,19 @@
                 if (boot.parentNode) boot.parentNode.removeChild(boot);
                 if (!state.boot) doc.documentElement.classList.remove('em-booting');
             };
-            if (!fade) {
+            if (!fade || !state.root) {
                 gone();
                 return;
             }
-            bootStep(boot, 4);
-            var waited = 0;
-            var wait = win.setInterval(function () {
-                waited += 50;
-                var hero = state.root && state.root.querySelector('.em-feature .em-img');
-                if (waited < 600 && hero && hero.className.indexOf('em-loaded') < 0) return;
-                win.clearInterval(wait);
+            var faded = false;
+            var fadeOut = function () {
+                if (faded) return;
+                faded = true;
                 addClass(boot, 'em-boot-out');
-                win.setTimeout(gone, 350);
-            }, 50);
+                win.setTimeout(gone, 450);
+            };
+            firstScreenReady(state.root).then(fadeOut);
+            win.setTimeout(fadeOut, BOOT_READY_MS);
         }
 
         // --- Up and Down into the hero ---------------------------------------------------------

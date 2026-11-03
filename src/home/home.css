@@ -18,9 +18,9 @@ html.em-active #indexPage .homeSectionsContainer {
 
 /* --- loading ---------------------------------------------------------------------------------- */
 
-/* While jellyfin-web starts on Home: first only the background, then Home's placeholders or Home
-   itself, and a status line if it takes a while. It never takes a click or a key, and jellyfin-web's
-   own splash and spinner stay out of sight beneath it. */
+/* While jellyfin-web starts on Home: first only the background, then Home's placeholders, then one
+   crossfade into Home once its first screen is ready. It never takes a click or a key, and
+   jellyfin-web's own splash and spinner stay out of sight beneath it. */
 html.em-booting .docspinner,
 html.em-booting .splashLogo {
     visibility: hidden !important;
@@ -35,10 +35,8 @@ html.em-booting .splashLogo {
     z-index: 1000;
     overflow: hidden;
     background: #101010;
-    color: #fff;
-    font-family: "Noto Sans", sans-serif;
     pointer-events: none;
-    transition: opacity 0.35s ease-out;
+    transition: opacity 0.4s ease-in-out;
 }
 
 .em-boot.em-boot-out {
@@ -55,50 +53,6 @@ html.em-booting .splashLogo {
 
 .em-boot-shown .em-boot-page {
     opacity: 1;
-}
-
-.em-boot-status {
-    position: absolute;
-    bottom: 7%;
-    left: 50%;
-    min-width: 18em;
-    max-width: 80%;
-    padding: 0.9em 1.4em 1em;
-    border-radius: 1.6em;
-    background: rgba(16, 16, 16, 0.9);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
-    text-align: center;
-    opacity: 0;
-    transform: translate(-50%, 8px);
-    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-}
-
-.em-boot-status-on .em-boot-status {
-    opacity: 1;
-    transform: translate(-50%, 0);
-}
-
-.em-boot-label {
-    margin-bottom: 0.7em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: 0.9;
-}
-
-.em-boot-bar {
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.14);
-    overflow: hidden;
-}
-
-.em-boot-bar div {
-    height: 100%;
-    background: #00a4dc;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.6s ease-out;
 }
 
 /* Placeholders: one soft sweep of light across them all, one layer, cheap on an older TV. */
@@ -415,8 +369,6 @@ html.em-booting .splashLogo {
 
     .em-boot,
     .em-boot-page,
-    .em-boot-status,
-    .em-boot-bar div,
     .em-img,
     .em-dot,
     .em-tv .em-card {
