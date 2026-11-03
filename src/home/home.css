@@ -13,7 +13,47 @@ html.em-active #indexPage .homeSectionsContainer {
 }
 
 .em-placeholder {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* --- loading ---------------------------------------------------------------------------------- */
+
+/* While jellyfin-web starts on Home: placeholders over everything, fading into the drawn page.
+   It never takes a click or a key. */
+.em-boot {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    overflow: hidden;
+    background: #101010;
+    pointer-events: none;
+    transition: opacity 0.3s ease-out;
+}
+
+.em-boot.em-boot-out {
+    opacity: 0;
+}
+
+/* One layer pulses, not each placeholder: cheap on an older TV. */
+.em-skeleton {
+    animation: em-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes em-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
+
+.em-reveal {
+    animation: em-fade-in 0.25s ease-out;
+}
+
+@keyframes em-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* --- the Billboard --------------------------------------------------------------------------- */
@@ -194,7 +234,9 @@ html.em-active #indexPage .homeSectionsContainer {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
-    padding-bottom: 4px;
+    /* Room for a focused card's ring and growth, given back by the margins so nothing moves. */
+    padding: var(--em-room, 8px);
+    margin: calc(-1 * var(--em-room, 8px));
 }
 
 .em-strip::-webkit-scrollbar {
@@ -281,6 +323,12 @@ html.em-active #indexPage .homeSectionsContainer {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .em-skeleton,
+    .em-reveal {
+        animation: none;
+    }
+
+    .em-boot,
     .em-img,
     .em-dot,
     .em-tv .em-card {

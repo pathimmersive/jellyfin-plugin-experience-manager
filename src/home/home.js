@@ -16,21 +16,25 @@
     var SETTINGS_WAIT_MS = 1000;
     var INLINE_SECTIONS = 4;
     var FALLBACK_FLAG = 'em-home-fallback';
+    var BOOT_MS = 10000;
+    // Where jellyfin-web puts Home's top edge, per layout, until the page is there to measure.
+    var BOOT_TOP = { tv: 134, web: 48, phone: 48 };
 
-    // Sizes in px per layout, from the design's Platforms and sizes table.
+    // Sizes in px per layout, from the design's Platforms and sizes table. room: the space a focused
+    // card's ring (and, on a TV, its growth) needs around it inside its row.
     var SIZES = {
         tv: {
-            feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10,
+            feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10, room: 18,
             landscape: [296, 166], tile: [296, 166], portrait: [160, 240],
             caption: [34, 62], captionSize: [20, 16], logo: 52, overview: [20, 640], button: [20, 52], message: 64
         },
         web: {
-            feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6,
+            feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6, room: 8,
             landscape: [278, 156], tile: [278, 156], portrait: [150, 225],
             caption: [30, 52], captionSize: [15, 13], logo: 48, overview: [16, 560], button: [15, 42], message: 56
         },
         phone: {
-            feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4,
+            feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4, room: 6,
             landscape: [240, 135], tile: [264, 148], portrait: [118, 177],
             caption: [28, 48], captionSize: [14, 12], logo: 34, overview: [14, 360], button: [15, 44], message: 52
         }
@@ -254,7 +258,8 @@
             original: {},        // each user's real home settings, by user id
             root: null,
             visit: 0,
-            rotation: null
+            rotation: null,
+            boot: null           // the loading screen shown while jellyfin-web starts on Home
         };
 
         function fallbackActive() {
@@ -429,6 +434,7 @@
         // The API failed after jellyfin-web was told to show no rows: reload once without the override.
         function fallBack() {
             stopRotation();
+            hideBoot(false);
             if (state.root && state.root.parentNode) state.root.parentNode.removeChild(state.root);
             state.root = null;
             doc.documentElement.classList.remove('em-active');
@@ -487,7 +493,7 @@
         }
 
         function skeleton(sizes) {
-            var frame = el('div', 'em-page');
+            var frame = el('div', 'em-page em-skeleton');
             var feature = el('div', 'em-feature em-placeholder');
             feature.style.height = px(sizes.feature);
             frame.appendChild(feature);
@@ -742,7 +748,10 @@
                     show(index + (left ? -1 : 1));
                 }
             });
-            box.addEventListener('focusin', function () { rotation.focused = true; });
+            box.addEventListener('focusin', function (e) {
+                rotation.focused = true;
+                if (e.target === play || e.target === more || e.target === favourite) box.emLast = e.target;
+            });
             box.addEventListener('focusout', function () { rotation.focused = false; });
 
             if (items.length > 1) {
@@ -756,6 +765,7 @@
             }
             show(0);
             box.emMore = more;
+            box.emPlay = play;
             return box;
         }
 
@@ -836,6 +846,8 @@
             if (!featureBox) mark('em-hero');
             if (!inlineRows) { mark('em-first-row'); mark('em-last-row'); }
 
+            // Over placeholders the page fades in; under the loading screen, the loading screen fades out.
+            if (!state.boot && container.querySelector('.em-skeleton')) frame.className += ' em-reveal';
             container.innerHTML = '';
             container.appendChild(frame);
             return featureBox;
@@ -870,6 +882,100 @@
             return container;
         }
 
+        // --- the loading screen ----------------------------------------------------------------
+        // When the app starts on Home, jellyfin-web takes a while to draw its page, and until then
+        // there is nowhere to put placeholders. A loading screen shaped like Home covers that time and
+        // fades into the drawn page. It never hides anything else: leaving Home, a dialog, a fallback
+        // or 10 s ends it.
+
+        function onHomeRoute() {
+            var hash = win.location.hash;
+            return !hash || /^#\/?(home(\.html)?)?([?&]|$)/.test(hash);
+        }
+
+        // jellyfin-web sets its layout class a little later; until then, its saved choice or the device.
+        function bootLayout() {
+            if (/(^|\s)layout-/.test(doc.documentElement.className)) return layoutOf(doc.documentElement.classList);
+            var saved = null;
+            try { saved = win.localStorage.getItem('layout'); } catch (e) { /* none */ }
+            if (saved === 'tv') return 'tv';
+            if (saved === 'mobile') return 'phone';
+            if (saved === 'desktop') return 'web';
+            var browser = win.navigator.userAgent || '';
+            if (/Web0S|webOS|Tizen|SMART-TV|SmartTV/i.test(browser)) return 'tv';
+            return /Mobi|Android/i.test(browser) ? 'phone' : 'web';
+        }
+
+        function fillBoot(boot, layout) {
+            var sizes = SIZES[layout];
+            boot.emLayout = layout;
+            boot.className = 'em-boot em-home em-' + layout;
+            boot.style.setProperty('--em-room', px(sizes.room));
+            boot.style.paddingTop = px(BOOT_TOP[layout]);
+            boot.innerHTML = '';
+            boot.appendChild(skeleton(sizes));
+        }
+
+        function showBoot() {
+            if (state.boot || fallbackActive() || !credentials() || !onHomeRoute()) return;
+            if (!doc.body) {
+                doc.addEventListener('DOMContentLoaded', showBoot);
+                return;
+            }
+            if (homeVisible()) return;
+            var boot = el('div');
+            boot.id = 'em-boot';
+            boot.setAttribute('aria-hidden', 'true');
+            fillBoot(boot, bootLayout());
+            doc.body.appendChild(boot);
+            state.boot = boot;
+            var started = Date.now();
+            boot.emTimer = win.setInterval(function () {
+                if (!onHomeRoute() || doc.querySelector('.dialogContainer .dialog') || Date.now() - started > BOOT_MS) {
+                    hideBoot(false);
+                    return;
+                }
+                var layout = bootLayout();
+                if (layout !== boot.emLayout) fillBoot(boot, layout);
+            }, 100);
+        }
+
+        function hideBoot(fade) {
+            var boot = state.boot;
+            if (!boot) return;
+            state.boot = null;
+            win.clearInterval(boot.emTimer);
+            var gone = function () { if (boot.parentNode) boot.parentNode.removeChild(boot); };
+            if (!fade) {
+                gone();
+                return;
+            }
+            // The placeholders line up with the drawn page as it shows through.
+            var top = state.root && state.root.parentNode ? state.root.getBoundingClientRect().top : 0;
+            if (top > 0) boot.style.paddingTop = px(top);
+            boot.className += ' em-boot-out';
+            win.setTimeout(gone, 300);
+        }
+
+        // --- Up and Down into the hero ---------------------------------------------------------
+        // jellyfin-web moves focus to whatever sits straight above or below. The hero's buttons sit at
+        // its left, so from most header buttons and most cards in the row below, it would skip them.
+        win.addEventListener('keydown', function (e) {
+            if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+            var down = e.key === 'ArrowDown' || e.keyCode === 40;
+            var up = e.key === 'ArrowUp' || e.keyCode === 38;
+            var from = doc.activeElement;
+            if ((!down && !up) || !from || !from.closest || !state.root || !state.root.parentNode || !homeVisible()) return;
+            var feature = state.root.querySelector('.em-feature');
+            if (!feature || !feature.emPlay) return;
+            var into = null;
+            if (down && from.closest('.skinHeader')) into = feature.emPlay;
+            else if (up && from.closest('.em-row') && from.closest('.em-row') === feature.nextElementSibling) into = feature.emLast || feature.emPlay;
+            if (!into) return;
+            e.preventDefault();
+            into.focus();
+        }, true);
+
         function mount() {
             var stock = homeVisible();
             if (!stock) return false;
@@ -883,6 +989,7 @@
                 container = el('div', 'em-home em-' + layout);
                 container.id = 'em-home';
                 container.style.setProperty('--em-ring', px(sizes.ring));
+                container.style.setProperty('--em-room', px(sizes.room));
                 stock.parentNode.insertBefore(container, stock);
                 state.root = container;
                 if (layout === 'tv') {
@@ -905,9 +1012,14 @@
             loadPage().then(function (page) {
                 if (visit !== state.visit) return;
                 var json = JSON.stringify(page);
-                if (container.emRendered === json) { mark('em-hero'); mark('em-first-row'); mark('em-last-row'); return; }
+                if (container.emRendered === json) {
+                    mark('em-hero'); mark('em-first-row'); mark('em-last-row');
+                    hideBoot(true);
+                    return;
+                }
                 container.emRendered = json;
                 var featureBox = render(container, sizes, layout, page);
+                hideBoot(true);
                 if (layout === 'tv') landFocus(container, featureBox);
             }, function () {
                 if (visit === state.visit) fallBack();
@@ -923,15 +1035,18 @@
             var tries = 0;
             timer = win.setInterval(function () {
                 tries++;
-                if (mount() || tries > 200) {
+                var mounted = mount();
+                if (mounted || tries > 200) {
                     win.clearInterval(timer);
                     timer = null;
+                    if (!mounted) hideBoot(false);
                 }
             }, 30);
         }
 
         win.addEventListener('hashchange', function () {
             stopRotation();
+            if (!onHomeRoute()) hideBoot(false);
             watch();
         });
         if (fallbackActive()) {
@@ -939,7 +1054,10 @@
             try { win.sessionStorage.removeItem(FALLBACK_FLAG); } catch (e) { /* stays */ }
             return;
         }
-        if (credentials()) loadPage();
+        if (credentials()) {
+            loadPage();
+            showBoot();
+        }
         watch();
     }
 })(this);
