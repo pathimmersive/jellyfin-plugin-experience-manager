@@ -273,6 +273,45 @@ code="$(get_status -H "$auth" "$base/ScheduledTasks")"
 grep -q '"Name":"Warm the home screen cache"' "$work/body" || fail "Dashboard → Scheduled Tasks does not list the cache warm-up task"
 pass "Dashboard → Scheduled Tasks lists the home screen cache warm-up"
 
+# The published contract, docs/api/openapi.json: it describes exactly the API the server reports for
+# the plugin (UPDATE_API_SCHEMA=1 rewrites it from there), live responses match it, and the
+# integration guide's requests run against this server.
+contract="$repo/docs/api/openapi.json"
+contract_tool="$repo/scripts/api-contract.mjs"
+curl -sf "$base/api-docs/openapi.json" -o "$work/server-openapi.json" || fail "GET /api-docs/openapi.json"
+docs_xml="$plugin_dir/Jellyfin.Plugin.ExperienceManager.xml"
+[ -f "$docs_xml" ] || fail "the plugin's XML documentation is missing from the publish output"
+if [ "${UPDATE_API_SCHEMA:-}" = "1" ]; then
+    node "$contract_tool" schema --openapi "$work/server-openapi.json" --xml "$docs_xml" --out "$contract" || fail "could not write docs/api/openapi.json"
+    pass "docs/api/openapi.json rewritten from the API the plugin serves"
+else
+    node "$contract_tool" schema --openapi "$work/server-openapi.json" --xml "$docs_xml" --out "$contract" --check         || fail "docs/api/openapi.json does not match the API the plugin serves"
+    pass "docs/api/openapi.json describes exactly the API the plugin serves, every route and parameter described"
+fi
+validate_live() {
+    local operation="$1" path="$2"
+    shift 2
+    curl -sf "$@" "$base/$path" -o "$work/live.json" || fail "GET /$path"
+    node "$contract_tool" validate --schema "$contract" --operation "$operation" "$work/live.json"         || fail "GET /$path does not match docs/api/openapi.json: $(cat "$work/live.json")"
+}
+validate_live GetInfo "ExperienceManager/Info"
+validate_live GetPage "ExperienceManager/v1/Pages/home" -H "$auth"
+validate_live GetPage "ExperienceManager/v1/Pages/home?include=items&count=2" -H "$auth"
+validate_live GetSectionItems "ExperienceManager/v1/Sections/mymedia/Items?startIndex=0&limit=5" -H "$auth"
+pass "Info, the page with and without items, and a section's items match docs/api/openapi.json"
+guide_dir="$work/guide"
+mkdir -p "$guide_dir"
+awk -v dir="$guide_dir" '/^```sh$/ { n++; inside = 1; next } /^```$/ { inside = 0; next } inside { print > (dir "/" n ".sh") }' "$repo/docs/api/README.md"
+requests=0
+for request in "$guide_dir"/*.sh; do
+    [ -e "$request" ] || break
+    SERVER="$base" TOKEN="$token" bash -euo pipefail "$request" >"$work/guide-out" 2>&1         || fail "the guide's example $(basename "$request" .sh) failed: $(cat "$work/guide-out")"
+    requests=$((requests + 1))
+done
+[ "$requests" -ge 5 ] || fail "the guide has $requests runnable examples, expected at least 5"
+grep -qx '304' "$work/guide-out" || fail "the guide's ETag example did not get a 304: $(cat "$work/guide-out")"
+pass "the integration guide's $requests examples run against the server"
+
 grep -q 'Home client added to jellyfin-web' "$work/server.log" \
     || fail "the plugin did not log that it adds the home client to jellyfin-web"
 pass "the plugin logs that it adds the home client to jellyfin-web"

@@ -1,0 +1,528 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Experience Manager home API",
+    "version": "1",
+    "description": "The home screen the Experience Manager plugin serves for Jellyfin, for any client to draw: pages of sections, each section's items as Jellyfin items, and discovery. See docs/api/README.md for the integration guide.",
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/pathimmersive/jellyfin-plugin-experience-manager/blob/main/docs/api/LICENSE"
+    }
+  },
+  "paths": {
+    "/ExperienceManager/Info": {
+      "get": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "GetInfo",
+        "summary": "Reports the plugin version, the API versions it serves and its enabled features.",
+        "responses": {
+          "200": {
+            "description": "The plugin's information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The server is currently starting or is temporarily not available."
+          }
+        },
+        "security": []
+      }
+    },
+    "/ExperienceManager/v1/Me/Preferences": {
+      "get": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "GetPreferences",
+        "summary": "Reserved, not yet available: the signed-in user's own home screen preferences.",
+        "description": "This route is named so clients can plan for it. Servers answer 404 until a version that serves it; `/ExperienceManager/Info` will list it in `Features` when it does.",
+        "x-not-yet-available": true,
+        "responses": {
+          "404": {
+            "description": "Not yet available."
+          }
+        }
+      }
+    },
+    "/ExperienceManager/v1/Pages/{pageId}": {
+      "get": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "GetPage",
+        "summary": "Gets a page's sections for the signed-in user, in order. With `include=items`, the first `count` sections (all of them when it is left out) carry their first items.",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "description": "The page; `home`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "description": "Set to `items` to inline the first sections' items.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "How many sections carry items.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Extra item fields, as Jellyfin's `fields`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enableImageTypes",
+            "in": "query",
+            "description": "The image types to include, as Jellyfin's `enableImageTypes`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageTypeLimit",
+            "in": "query",
+            "description": "How many images of each type.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "enableUserData",
+            "in": "query",
+            "description": "Whether to include played state and progress.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, or 304 when the client already has it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The server is currently starting or is temporarily not available."
+          }
+        },
+        "security": [
+          {
+            "CustomAuthentication": [
+              "DefaultAuthorization"
+            ]
+          }
+        ]
+      }
+    },
+    "/ExperienceManager/v1/Sections/{sectionId}/Items": {
+      "get": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "GetSectionItems",
+        "summary": "Gets a page of one section's items for the signed-in user.",
+        "parameters": [
+          {
+            "name": "sectionId",
+            "in": "path",
+            "description": "The section's id, from the page.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startIndex",
+            "in": "query",
+            "description": "The first item.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many items, at most 100.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Extra item fields, as Jellyfin's `fields`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enableImageTypes",
+            "in": "query",
+            "description": "The image types to include.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageTypeLimit",
+            "in": "query",
+            "description": "How many images of each type.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "enableUserData",
+            "in": "query",
+            "description": "Whether to include played state and progress.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The items, or 404 when the user's page has no such section.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseItemDtoQueryResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The server is currently starting or is temporarily not available."
+          }
+        },
+        "security": [
+          {
+            "CustomAuthentication": [
+              "DefaultAuthorization"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BaseItemDto": {
+        "type": "object",
+        "description": "A Jellyfin item, exactly as Jellyfin's own item routes return it. Its schema is Jellyfin's `BaseItemDto`, in the server's own OpenAPI document at `/api-docs/openapi.json`.",
+        "additionalProperties": true
+      },
+      "BaseItemDtoQueryResult": {
+        "type": "object",
+        "properties": {
+          "Items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BaseItemDto"
+            },
+            "description": "Gets or sets the items."
+          },
+          "TotalRecordCount": {
+            "type": "integer",
+            "description": "Gets or sets the total number of records available.",
+            "format": "int32"
+          },
+          "StartIndex": {
+            "type": "integer",
+            "description": "Gets or sets the index of the first record in Items.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query result container."
+      },
+      "InfoResponse": {
+        "type": "object",
+        "properties": {
+          "Version": {
+            "type": "string",
+            "description": "The plugin version."
+          },
+          "ApiVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The API versions served."
+          },
+          "Features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The features enabled on this server."
+          }
+        },
+        "additionalProperties": false,
+        "description": "What the plugin offers, for clients deciding whether to use it.",
+        "required": [
+          "Version",
+          "ApiVersions",
+          "Features"
+        ]
+      },
+      "PageResponse": {
+        "type": "object",
+        "properties": {
+          "PageId": {
+            "type": "string",
+            "description": "The page, `home`."
+          },
+          "LayoutVersion": {
+            "type": "string",
+            "description": "Changes whenever the layout changes."
+          },
+          "Sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SectionResponse"
+            },
+            "description": "The sections, in order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A resolved page: its sections in order.",
+        "required": [
+          "PageId",
+          "LayoutVersion",
+          "Sections"
+        ]
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": {}
+      },
+      "SectionDisplay": {
+        "type": "object",
+        "properties": {
+          "Hint": {
+            "type": "string",
+            "description": "Either `row` or `feature`."
+          },
+          "Shape": {
+            "type": "string",
+            "description": "The card shape: `portrait`, `landscape` or `square`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "How a client shows a section. Clients that do not know a hint fall back: an unknown feature style to a plain feature, an unknown feature to a row.",
+        "required": [
+          "Hint",
+          "Shape"
+        ]
+      },
+      "SectionResponse": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "The section's stable id."
+          },
+          "Title": {
+            "type": "string",
+            "description": "The title shown above it."
+          },
+          "Kind": {
+            "type": "string",
+            "description": "The content kind; `items` for every section on the fixed Home page."
+          },
+          "Display": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SectionDisplay"
+              }
+            ],
+            "description": "How to show it."
+          },
+          "Rank": {
+            "type": "boolean",
+            "description": "Whether the cards show their position, as in a Top 10."
+          },
+          "SeeAll": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SeeAllTarget"
+              }
+            ],
+            "nullable": true,
+            "description": "Where \"see all\" leads, or null when there is nowhere to go."
+          },
+          "Items": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BaseItemDtoQueryResult"
+              }
+            ],
+            "description": "The first items, when the page call asked for them.",
+            "nullable": true
+          },
+          "Error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the items are missing, when the section failed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One section of a page, as the client sees it. Clients need no knowledge of section types: an unknown `Kind` is skipped.",
+        "required": [
+          "Id",
+          "Title",
+          "Kind",
+          "Display",
+          "Rank"
+        ]
+      },
+      "SeeAllTarget": {
+        "type": "object",
+        "properties": {
+          "ParentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The library to browse, if the section belongs to one."
+          },
+          "IncludeItemTypes": {
+            "type": "string",
+            "description": "The item types to list."
+          },
+          "SortBy": {
+            "type": "string",
+            "description": "The sort, as Jellyfin's `sortBy` parameter."
+          },
+          "SortOrder": {
+            "type": "string",
+            "description": "Ascending or Descending."
+          },
+          "Filters": {
+            "type": "string",
+            "nullable": true,
+            "description": "Jellyfin's `filters` parameter, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Where \"see all\" leads: a standard Jellyfin item query a client can run itself.",
+        "required": [
+          "IncludeItemTypes",
+          "SortBy",
+          "SortOrder"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "CustomAuthentication": {
+        "type": "apiKey",
+        "description": "API key header parameter",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  }
+}

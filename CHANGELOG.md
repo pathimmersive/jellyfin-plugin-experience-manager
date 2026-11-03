@@ -19,4 +19,5 @@ All notable changes to Experience Manager are listed here. The format follows [K
   - the Home page's sections in order: featured films, My Media, Continue Watching, Next Up, and Latest for each movie and show library;
   - each section's items as Jellyfin's own item type, paged;
   - `/ExperienceManager/Info` for discovery.
+- The home API's contract and an integration guide for client authors, in docs/api/, MIT licensed. Tests keep the contract matching what the plugin serves.
 - A shared cache behind the home page, kept up to date as libraries and watch progress change, and warmed by a scheduled task when the server starts.
