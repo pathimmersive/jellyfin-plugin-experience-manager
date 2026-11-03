@@ -661,6 +661,12 @@
                 dots.appendChild(pause);
             }
 
+            // Only the text changes per slide: the buttons stay put, so a focused one keeps focus.
+            var text = el('div', 'em-feature-text');
+            info.appendChild(text);
+            info.appendChild(buttons);
+            info.appendChild(dots);
+
             var index = 0;
             var heroMarked = false;
             var rotation = { timer: null, elapsed: 0, focused: false, paused: false };
@@ -685,25 +691,23 @@
                     new win.Image().src = imageUrl(base, next.Id, 'Backdrop', next.BackdropImageTags[0], Math.min(win.innerWidth, 1920), win.devicePixelRatio);
                 }
 
-                info.innerHTML = '';
+                text.innerHTML = '';
                 if (item.ImageTags && item.ImageTags.Logo) {
                     var logo = el('img', 'em-logo');
                     logo.alt = item.Name;
                     logo.style.height = px(sizes.logo);
                     logo.src = imageUrl(base, item.Id, 'Logo', item.ImageTags.Logo, sizes.logo * 6, win.devicePixelRatio);
-                    info.appendChild(logo);
+                    text.appendChild(logo);
                 } else {
                     var title = el('div', 'em-feature-title', item.Name);
                     title.style.fontSize = px(sizes.logo * 0.8);
-                    info.appendChild(title);
+                    text.appendChild(title);
                 }
-                info.appendChild(el('div', 'em-meta', metaOf(item)));
+                text.appendChild(el('div', 'em-meta', metaOf(item)));
                 var overview = el('div', 'em-overview', item.Overview || '');
                 overview.style.fontSize = px(sizes.overview[0]);
                 overview.style.maxWidth = px(sizes.overview[1]);
-                info.appendChild(overview);
-                info.appendChild(buttons);
-                info.appendChild(dots);
+                text.appendChild(overview);
                 favourite.textContent = item.UserData && item.UserData.IsFavorite ? '♥' : '♡';
                 favourite.setAttribute('aria-pressed', item.UserData && item.UserData.IsFavorite ? 'true' : 'false');
                 for (var k = 0; k < dotEls.length; k++) dotEls[k].className = k === index ? 'em-dot em-dot-on' : 'em-dot';
