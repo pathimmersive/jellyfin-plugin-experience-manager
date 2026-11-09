@@ -18,21 +18,25 @@ public class AdminController : ControllerBase
     public const string Route = HomeClient.Route + "/Admin";
 
     private readonly IDeviceManager _devices;
+    private readonly ReachRegistry _reach;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AdminController"/> class.
     /// </summary>
     /// <param name="devices">The device manager.</param>
-    public AdminController(IDeviceManager devices)
+    /// <param name="reach">The reach adapters.</param>
+    public AdminController(IDeviceManager devices, ReachRegistry reach)
     {
         _devices = devices;
+        _reach = reach;
     }
 
     /// <summary>
-    /// Gets the client census: every registered device by user and client family, and what Experience Manager reaches on each family.
+    /// Gets the client census: every registered device by user and client family, what Experience Manager reaches on each
+    /// family, and every reach adapter with its Detect status.
     /// </summary>
     /// <returns>The census.</returns>
     [HttpGet("Clients")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<ClientCensusResponse> GetClients() => ClientCensus.Build(_devices.GetDevicesForUser(null).Items);
+    public ActionResult<ClientCensusResponse> GetClients() => ClientCensus.Build(_devices.GetDevicesForUser(null).Items, _reach.Statuses());
 }

@@ -8,6 +8,7 @@ All notable changes to Experience Manager are listed here. The format follows [K
 
 - An admin page with its own entry in the Dashboard sidebar, grouped as Experience, People, Rules, Reach and Operate. Pages not built yet say so.
 - Reach → Native clients: every device registered with the server, by user and app, and what Experience Manager reaches on each app today and what is planned. Server apps such as Seerr are listed apart. Its admin-only route is not part of the public API.
+- Reach adapters: every way Experience Manager reaches an app goes through one contract, and Native clients lists each adapter with what it found. The home screen is the first, on and ready; the Moonfin, Wholphin and Streamyfin adapters, stock home sections and maintained collections are listed as not built yet, and cannot be switched on. Every adapter but the home screen is off by default, stored per server in the plugin's settings.
 - Installation from a Jellyfin plugin repository.
 - A plugin image in Dashboard → Plugins and in the plugin repository's catalog.
 - Experience Manager's home screen in jellyfin-web, in place of its own home rows:
