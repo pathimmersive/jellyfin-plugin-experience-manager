@@ -108,6 +108,8 @@
                 }
 
                 function drawCensus(panel, census) {
+                    var families = {};
+                    census.Reach.forEach(function (r) { families[r.Id] = r.Name; });
                     panel.appendChild(el('h3', 'Reach by app'));
                     panel.appendChild(table(['App', 'Devices', 'Users', 'Today', 'Planned'], census.Reach.map(function (r) {
                         var name = el('div');
@@ -116,9 +118,19 @@
                         return [name, r.Devices, r.Users, r.Today, r.Planned || 'Nothing planned yet.'];
                     })));
 
+                    panel.appendChild(el('h3', 'Reach adapters'));
+                    panel.appendChild(el('p', 'Each way Experience Manager reaches an app, and what it found. One not built yet cannot be switched on.', 'em-muted'));
+                    panel.appendChild(table(['Adapter', 'How', 'Apps', 'Status'], census.Adapters.map(function (a) {
+                        var name = el('div');
+                        name.appendChild(el('div', a.Name));
+                        name.appendChild(el('div', a.Reaches, 'em-apps'));
+                        var status = el('div');
+                        status.appendChild(el('div', a.Status + (a.Version ? ' (' + a.Version + ')' : ''), 'em-adapter-status'));
+                        status.appendChild(el('div', a.Reason, 'em-apps'));
+                        return [name, a.Mechanism, a.Families.map(function (f) { return families[f] || f; }).join(', '), status];
+                    })));
+
                     panel.appendChild(el('h3', 'Clients by user'));
-                    var families = {};
-                    census.Reach.forEach(function (r) { families[r.Id] = r.Name; });
                     if (!census.Users.length) panel.appendChild(el('p', 'No client has signed in yet.', 'em-muted'));
                     census.Users.forEach(function (u) {
                         panel.appendChild(el('h4', u.UserName || 'No user signed in'));

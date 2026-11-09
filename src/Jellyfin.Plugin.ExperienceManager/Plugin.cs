@@ -21,7 +21,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
         : base(applicationPaths, xmlSerializer)
     {
+        Instance = this;
     }
+
+    /// <summary>
+    /// Gets the loaded plugin, whose configuration holds the reach adapters' switches.
+    /// </summary>
+    public static Plugin? Instance { get; private set; }
 
     /// <summary>
     /// The plugin id, also written to meta.json by the build.

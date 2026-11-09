@@ -34,7 +34,7 @@ public class HomeApiControllerTests
         _page.LayoutVersion.Returns("test-1");
         _page.SectionsFor(Viewer).Returns(
         [
-            new PageSection("latest", "Latest", new SectionDisplay("row", "portrait"), null, 16, _ => ([Latest], true)),
+            new PageSection("latest", "Latest", new SectionDisplay("row", "portrait"), new SectionSource(SectionSources.Latest, null, "Movie"), null, 16, _ => ([Latest], true)),
         ]);
     }
 

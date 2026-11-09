@@ -30,7 +30,7 @@ public class HomePageServiceTests
     internal static Movie Film(string name) => new() { Id = Guid.NewGuid(), Name = name };
 
     private static PageSection Section(string id, int count, string hint = "row", Func<User, (IReadOnlyList<BaseItem>, bool)>? load = null) =>
-        new(id, id, new SectionDisplay(hint, "landscape"), null, 3, load ?? (_ => (Enumerable.Range(0, count).Select(i => (BaseItem)Film($"{id}-{i}")).ToList(), true)));
+        new(id, id, new SectionDisplay(hint, "landscape"), new SectionSource(SectionSources.Section), null, 3, load ?? (_ => (Enumerable.Range(0, count).Select(i => (BaseItem)Film($"{id}-{i}")).ToList(), true)));
 
     private HomePageService Service(params PageSection[] sections)
     {

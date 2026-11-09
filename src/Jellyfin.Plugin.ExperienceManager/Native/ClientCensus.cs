@@ -24,16 +24,18 @@ public sealed record CensusDevice(string FamilyId, string AppName, string AppVer
 public sealed record CensusUser(Guid? UserId, string UserName, IReadOnlyList<CensusDevice> Devices);
 
 /// <summary>
-/// One row of the reach matrix: a client family, how many devices and users run it, and what Experience Manager reaches there.
+/// One row of the reach matrix: a client family, how many devices and users run it, and what Experience Manager
+/// reaches there, from the adapters that name it.
 /// </summary>
 /// <param name="Id">The family's id.</param>
 /// <param name="Name">The family's name.</param>
 /// <param name="Devices">How many registered devices run it.</param>
 /// <param name="Users">How many users run it.</param>
-/// <param name="Today">What Experience Manager reaches on it now.</param>
-/// <param name="Planned">What a planned way of reaching it would add, or null.</param>
+/// <param name="Today">What the adapters that are on and ready reach on it now.</param>
+/// <param name="Planned">What the adapters not built yet would add, or null.</param>
 /// <param name="AppNames">The app names its devices reported, for families matched by name or for Other.</param>
-public sealed record ReachRow(string Id, string Name, int Devices, int Users, string Today, string? Planned, IReadOnlyList<string> AppNames);
+/// <param name="Adapters">The ids of the adapters that name it.</param>
+public sealed record ReachRow(string Id, string Name, int Devices, int Users, string Today, string? Planned, IReadOnlyList<string> AppNames, IReadOnlyList<string> Adapters);
 
 /// <summary>
 /// The client census: which clients each user runs, the reach matrix, and the server apps that sign in as devices.
@@ -42,19 +44,24 @@ public sealed record ReachRow(string Id, string Name, int Devices, int Users, st
 /// <param name="Users">Each user's client devices.</param>
 /// <param name="Reach">The reach matrix: every client family, with the families in use first.</param>
 /// <param name="Services">Server apps that sign in as devices, listed apart from clients.</param>
-public sealed record ClientCensusResponse(int TotalDevices, IReadOnlyList<CensusUser> Users, IReadOnlyList<ReachRow> Reach, IReadOnlyList<CensusDevice> Services);
+/// <param name="Adapters">Every reach adapter, with its Detect status.</param>
+public sealed record ClientCensusResponse(int TotalDevices, IReadOnlyList<CensusUser> Users, IReadOnlyList<ReachRow> Reach, IReadOnlyList<CensusDevice> Services, IReadOnlyList<ReachAdapterStatus> Adapters);
 
 /// <summary>
 /// Builds the client census from Jellyfin's registered devices.
 /// </summary>
 public static class ClientCensus
 {
+    /// <summary>What a family gets when no adapter that is on reaches it.</summary>
+    public const string ContentOnly = "Content only, as Jellyfin serves it: no Experience Manager sections yet.";
+
     /// <summary>
     /// Builds the census.
     /// </summary>
     /// <param name="devices">Every registered device.</param>
+    /// <param name="adapters">Every reach adapter, with its status.</param>
     /// <returns>The census.</returns>
-    public static ClientCensusResponse Build(IReadOnlyList<DeviceInfoDto> devices)
+    public static ClientCensusResponse Build(IReadOnlyList<DeviceInfoDto> devices, IReadOnlyList<ReachAdapterStatus> adapters)
     {
         var entries = devices
             .Select(d => (Info: d, Family: ClientFamilies.For(d.AppName)))
@@ -81,14 +88,18 @@ public static class ClientCensus
             .Select((family, order) =>
             {
                 var used = clients.Where(e => e.Family.Id == family.Id).ToList();
+                var reaching = adapters.Where(a => a.Families.Contains(family.Id)).ToList();
+                var today = reaching.Where(a => a.On && a.Status == "ready").Select(a => a.Reaches).ToList();
+                var planned = reaching.Where(a => !a.Built).Select(a => a.Reaches).ToList();
                 return (Order: order, Row: new ReachRow(
                     family.Id,
                     family.Name,
                     used.Count,
                     used.Select(e => e.Info.LastUserId).Distinct().Count(),
-                    family.Today,
-                    family.Planned,
-                    used.Select(e => e.Device.AppName).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList()));
+                    today.Count > 0 ? string.Join(" ", today) : ContentOnly,
+                    planned.Count > 0 ? string.Join(" ", planned) : null,
+                    used.Select(e => e.Device.AppName).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+                    reaching.Select(a => a.Id).ToList()));
             })
             .OrderBy(r => r.Row.Devices == 0)
             .ThenBy(r => r.Order)
@@ -101,6 +112,6 @@ public static class ClientCensus
             .OrderByDescending(d => d.LastActivity)
             .ToList();
 
-        return new ClientCensusResponse(devices.Count, users, reach, services);
+        return new ClientCensusResponse(devices.Count, users, reach, services, adapters);
     }
 }

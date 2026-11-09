@@ -1,6 +1,9 @@
+using System;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Home;
 using Jellyfin.Plugin.ExperienceManager.Integration;
+using Jellyfin.Plugin.ExperienceManager.Native;
+using Jellyfin.Plugin.ExperienceManager.Native.Adapters;
 using Jellyfin.Plugin.ExperienceManager.Tasks;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -26,5 +29,16 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IHomePage, FixedHomePage>();
         serviceCollection.AddSingleton<HomePageService>();
         serviceCollection.AddSingleton<IScheduledTask, WarmHomeCacheTask>();
+
+        serviceCollection.AddSingleton<ExperienceResolver>();
+        foreach (var adapter in ReachAdapters.Create(() => applicationHost.ApplicationVersion))
+        {
+            serviceCollection.AddSingleton(adapter);
+        }
+
+        serviceCollection.AddSingleton<IReachSwitches>(_ => new ConfigurationReachSwitches(
+            () => Plugin.Instance?.Configuration ?? throw new InvalidOperationException("The plugin is not loaded."),
+            () => Plugin.Instance?.SaveConfiguration()));
+        serviceCollection.AddSingleton<ReachRegistry>();
     }
 }

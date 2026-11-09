@@ -143,6 +143,16 @@ public class FixedHomePageTests
             Assert.Equal("Latest Shows", sections[5].Title);
             Assert.Equal("Series", sections[5].SeeAll!.IncludeItemTypes);
             Assert.Equal(films.ToString("N"), sections[4].SeeAll!.ParentId);
+            Assert.Equal(
+                [
+                    new SectionSource(SectionSources.Featured),
+                    new SectionSource(SectionSources.MyMedia),
+                    new SectionSource(SectionSources.ContinueWatching),
+                    new SectionSource(SectionSources.NextUp),
+                    new SectionSource(SectionSources.Latest, films.ToString("N"), "Movie"),
+                    new SectionSource(SectionSources.Latest, shows.ToString("N"), "Series"),
+                ],
+                sections.Select(s => s.Source));
         }
     }
 
