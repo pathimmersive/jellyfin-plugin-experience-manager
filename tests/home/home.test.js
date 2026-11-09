@@ -100,6 +100,12 @@ test('BlurHashes decode to their average colour', () => {
     assert.throws(() => home.decodeBlurHash('not a hash!', w, h));
 });
 
+test('the client reads the home screen from the public v1 API only', () => {
+    const routes = read('src/home/home.js').match(/\/ExperienceManager\/[^'"?]*/g);
+    assert.ok(routes.length > 0);
+    for (const route of routes) assert.match(route, /^\/ExperienceManager\/v1\/(Pages|Sections)\//, route);
+});
+
 // The oldest LG TVs in use run Chromium 68 (webOS 5). These are the language and platform
 // features the client must not use, with the Chromium version that brought each.
 const withoutComments = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

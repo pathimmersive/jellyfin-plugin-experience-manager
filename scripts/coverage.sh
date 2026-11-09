@@ -25,6 +25,7 @@ package="$(grep -o '<package [^>]*name="Jellyfin.Plugin.ExperienceManager"[^>]*>
 rate() { echo "$package" | sed -E "s/.* $1=\"([0-9.]+)\".*/\1/" | awk '{ printf "%.1f%%", $1 * 100 }'; }
 
 node --test --experimental-test-coverage "tests/home/*.test.js" | tee "$out/home.txt"
+node --test "tests/api/*.test.mjs" || fail "the API contract tests failed"
 client="$(grep -E '^.{0,4}[[:space:]]*home\.js[[:space:]]*\|' "$out/home.txt" || true)"
 [ -n "$client" ] || fail "the home client coverage report does not include home.js"
 column() { echo "$client" | awk -F'|' -v n="$1" '{ gsub(/ /, "", $n); print $n "%" }'; }
