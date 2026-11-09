@@ -16,6 +16,7 @@ const server = () => ({
                 responses: { 200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/BaseItemDtoQueryResult' } } } }, 404: { description: 'Not Found' } }
             }
         },
+        '/ExperienceManager/Admin/Clients': { get: { operationId: 'GetClients', security: [{ CustomAuthentication: ['RequiresElevation'] }], responses: { 200: { description: 'OK' } } } },
         '/ExperienceManager/home.js': { get: { operationId: 'GetScript', responses: { 200: { description: 'OK' } } } },
         '/Items': { get: { operationId: 'GetItems', responses: { 200: { description: 'OK' } } } }
     },
