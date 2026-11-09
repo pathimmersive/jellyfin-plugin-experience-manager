@@ -6,12 +6,144 @@
 </head>
 <body>
     <div id="experienceManagerPage" data-role="page" class="page type-interior pluginConfigurationPage">
+        <style>
+            #experienceManagerPage .em-nav { display: flex; flex-wrap: wrap; gap: 1.5em; margin: 1em 0 2em; }
+            #experienceManagerPage .em-nav-group { min-width: 9em; }
+            #experienceManagerPage .em-nav-group h3 { margin: 0 0 .4em; font-size: .85em; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+            #experienceManagerPage .em-nav-page { display: block; background: none; border: 0; padding: .25em 0; color: inherit; font: inherit; cursor: pointer; opacity: .75; text-align: left; }
+            #experienceManagerPage .em-nav-page[aria-current="page"] { opacity: 1; font-weight: 600; }
+            #experienceManagerPage .em-nav-page .em-later { font-size: .8em; opacity: .7; }
+            #experienceManagerPage table { border-collapse: collapse; width: 100%; margin: .5em 0 2em; }
+            #experienceManagerPage th, #experienceManagerPage td { text-align: left; vertical-align: top; padding: .45em .8em .45em 0; border-bottom: 1px solid rgba(128, 128, 128, .25); }
+            #experienceManagerPage th { font-weight: 600; }
+            #experienceManagerPage td.em-num { text-align: right; padding-right: 1.5em; }
+            #experienceManagerPage .em-apps { font-size: .85em; opacity: .7; }
+            #experienceManagerPage .em-muted { opacity: .7; }
+        </style>
         <div data-role="content">
             <div class="content-primary">
                 <h2 class="sectionTitle">Experience Manager</h2>
-                <p>Nothing to set up yet.</p>
+                <nav class="em-nav" aria-label="Experience Manager"></nav>
+                <div class="em-panel"></div>
             </div>
         </div>
+        <script type="text/javascript">
+            (function () {
+                var page = document.querySelector('#experienceManagerPage');
+                // The admin pages, grouped as the plugin's design has them. Only the built ones open.
+                var groups = [
+                    { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout' }, { id: 'programming', title: 'Programming' }] },
+                    { title: 'People', pages: [{ id: 'audiences', title: 'Audiences' }, { id: 'defaults', title: 'Group defaults' }] },
+                    { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules' }, { id: 'integrations', title: 'Integrations' }] },
+                    { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
+                    { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History' }, { id: 'backup', title: 'Backup' }] }
+                ];
+                var current = 'clients';
+
+                function el(tag, text, className) {
+                    var node = document.createElement(tag);
+                    if (text != null) node.textContent = text;
+                    if (className) node.className = className;
+                    return node;
+                }
+
+                function table(headings, rows) {
+                    var t = el('table');
+                    var head = t.appendChild(el('thead')).appendChild(el('tr'));
+                    headings.forEach(function (h) { head.appendChild(el('th', h)); });
+                    var body = t.appendChild(el('tbody'));
+                    rows.forEach(function (cells) {
+                        var tr = body.appendChild(el('tr'));
+                        cells.forEach(function (cell) {
+                            var td = tr.appendChild(el('td'));
+                            if (cell && cell.nodeType) td.appendChild(cell);
+                            else if (typeof cell === 'number') { td.textContent = String(cell); td.className = 'em-num'; }
+                            else td.textContent = cell == null ? '' : cell;
+                        });
+                    });
+                    return t;
+                }
+
+                function when(utc) {
+                    var date = new Date(utc);
+                    return date.getFullYear() < 2000 ? 'Never' : date.toLocaleString();
+                }
+
+                function drawNav() {
+                    var nav = page.querySelector('.em-nav');
+                    nav.textContent = '';
+                    groups.forEach(function (group) {
+                        var g = nav.appendChild(el('div', null, 'em-nav-group'));
+                        g.appendChild(el('h3', group.title));
+                        group.pages.forEach(function (p) {
+                            var button = g.appendChild(el('button', p.title, 'em-nav-page'));
+                            button.type = 'button';
+                            button.setAttribute('data-page', p.id);
+                            if (p.id === current) button.setAttribute('aria-current', 'page');
+                            if (!p.built) button.appendChild(el('span', ' (coming later)', 'em-later'));
+                            button.addEventListener('click', function () { current = p.id; drawNav(); drawPanel(); });
+                        });
+                    });
+                }
+
+                function drawPanel() {
+                    var panel = page.querySelector('.em-panel');
+                    panel.textContent = '';
+                    var found = null;
+                    groups.forEach(function (g) { g.pages.forEach(function (p) { if (p.id === current) found = p; }); });
+                    panel.appendChild(el('h2', found.title));
+                    if (!found.built) {
+                        panel.appendChild(el('p', 'Coming later.', 'em-muted'));
+                        return;
+                    }
+                    panel.appendChild(el('p', 'Which apps your users watch on, and what Experience Manager reaches on each. Every device registered with this server is counted.'));
+                    var status = panel.appendChild(el('p', 'Loading…', 'em-muted em-status'));
+                    ApiClient.getJSON(ApiClient.getUrl('ExperienceManager/Admin/Clients')).then(function (census) {
+                        if (current !== 'clients') return;
+                        status.remove();
+                        drawCensus(panel, census);
+                    }, function () {
+                        status.textContent = 'The census could not be loaded. Reload the page to try again.';
+                    });
+                }
+
+                function drawCensus(panel, census) {
+                    panel.appendChild(el('h3', 'Reach by app'));
+                    panel.appendChild(table(['App', 'Devices', 'Users', 'Today', 'Planned'], census.Reach.map(function (r) {
+                        var name = el('div');
+                        name.appendChild(el('div', r.Name));
+                        if (r.AppNames.length) name.appendChild(el('div', r.AppNames.join(', '), 'em-apps'));
+                        return [name, r.Devices, r.Users, r.Today, r.Planned || 'Nothing planned yet.'];
+                    })));
+
+                    panel.appendChild(el('h3', 'Clients by user'));
+                    var families = {};
+                    census.Reach.forEach(function (r) { families[r.Id] = r.Name; });
+                    if (!census.Users.length) panel.appendChild(el('p', 'No client has signed in yet.', 'em-muted'));
+                    census.Users.forEach(function (u) {
+                        panel.appendChild(el('h4', u.UserName || 'No user signed in'));
+                        panel.appendChild(table(['App', 'Version', 'Device', 'Last active'], u.Devices.map(function (d) {
+                            var app = el('div');
+                            app.appendChild(el('div', families[d.FamilyId] || d.AppName));
+                            if (d.FamilyId === 'other' || families[d.FamilyId] !== d.AppName) app.appendChild(el('div', d.AppName, 'em-apps'));
+                            return [app, d.AppVersion, d.DeviceName, when(d.LastActivity)];
+                        })));
+                    });
+
+                    panel.appendChild(el('h3', 'Server apps'));
+                    panel.appendChild(el('p', 'Apps such as Seerr sign in as devices but are not clients anyone watches on.', 'em-muted'));
+                    panel.appendChild(census.Services.length
+                        ? table(['App', 'Version', 'Device', 'Last active'], census.Services.map(function (d) { return [d.AppName, d.AppVersion, d.DeviceName, when(d.LastActivity)]; }))
+                        : el('p', 'None.', 'em-muted'));
+                    panel.appendChild(el('p', census.TotalDevices + ' registered devices in all.', 'em-muted em-total'));
+                }
+
+                page.addEventListener('pageshow', function () {
+                    drawNav();
+                    drawPanel();
+                });
+            })();
+        </script>
     </div>
 </body>
 </html>

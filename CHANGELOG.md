@@ -6,7 +6,8 @@ All notable changes to Experience Manager are listed here. The format follows [K
 
 ### Added
 
-- An admin page with its own entry in the Dashboard sidebar. It is empty for now.
+- An admin page with its own entry in the Dashboard sidebar, grouped as Experience, People, Rules, Reach and Operate. Pages not built yet say so.
+- Reach → Native clients: every device registered with the server, by user and app, and what Experience Manager reaches on each app today and what is planned. Server apps such as Seerr are listed apart. Its admin-only route is not part of the public API.
 - Installation from a Jellyfin plugin repository.
 - A plugin image in Dashboard → Plugins and in the plugin repository's catalog.
 - Experience Manager's home screen in jellyfin-web, in place of its own home rows:

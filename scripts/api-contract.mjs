@@ -16,6 +16,11 @@ export const PREFIX = '/ExperienceManager/'
 // The web client's own files: served by the plugin, but not API.
 export const CLIENT_FILES = ['/ExperienceManager/home.js', '/ExperienceManager/home.css']
 
+// The admin page's own routes: administrators only, free to change, and not for client authors.
+export const ADMIN_PREFIX = '/ExperienceManager/Admin/'
+
+export const isPublicRoute = route => route.startsWith(PREFIX) && !CLIENT_FILES.includes(route) && !route.startsWith(ADMIN_PREFIX)
+
 // Jellyfin's own item shape is referenced, not copied: it is Jellyfin's to define and changes with it.
 const JELLYFIN_TYPES = {
     BaseItemDto: {
@@ -99,7 +104,7 @@ export function buildContract(server, docs) {
     const missing = []
     const paths = {}
     for (const [route, item] of Object.entries(server.paths)) {
-        if (!route.startsWith(PREFIX) || CLIENT_FILES.includes(route)) continue
+        if (!isPublicRoute(route)) continue
         paths[route] = {}
         for (const [method, op] of Object.entries(item)) {
             const doc = docs.methods.get(op.operationId)
