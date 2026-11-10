@@ -75,6 +75,25 @@
             #experienceManagerPage .em-aud-form { margin: 1.5em 0; padding: 1em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; max-width: 40em; box-sizing: border-box; }
             #experienceManagerPage .em-aud-users { display: flex; flex-wrap: wrap; gap: .4em 1.2em; margin: .6em 0; }
             #experienceManagerPage .em-aud-error { color: #ff8a65; }
+            #experienceManagerPage .em-lay-toolbar { display: flex; flex-wrap: wrap; gap: .6em; align-items: center; margin: 1em 0; }
+            #experienceManagerPage .em-lay-banner { display: flex; flex-wrap: wrap; gap: .6em; align-items: center; padding: .6em .8em; margin: 0 0 1em; border-radius: .3em; background: rgba(255, 138, 101, .18); }
+            #experienceManagerPage .em-lay-list { list-style: none; padding: 0; margin: .5em 0 1em; }
+            #experienceManagerPage .em-lay-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6em; padding: .5em; margin: 0 0 .4em; border: 1px solid rgba(128, 128, 128, .3); border-radius: .3em; }
+            #experienceManagerPage .em-lay-row:focus { outline: 2px solid #00a4dc; }
+            #experienceManagerPage .em-lay-row[aria-selected="true"] { border-color: #00a4dc; }
+            #experienceManagerPage .em-lay-row.em-picked { background: rgba(0, 164, 220, .25); }
+            #experienceManagerPage .em-lay-row.em-off .em-lay-title { opacity: .55; }
+            #experienceManagerPage .em-lay-row.em-removed .em-lay-title { text-decoration: line-through; opacity: .55; }
+            #experienceManagerPage .em-lay-text { flex: 1 1 14em; min-width: 0; }
+            #experienceManagerPage .em-lay-title { font-weight: 600; }
+            #experienceManagerPage .em-lay-type { font-size: .85em; opacity: .75; }
+            #experienceManagerPage .em-lay-badge { display: inline-block; font-size: .75em; padding: .1em .4em; margin: .2em .3em 0 0; border-radius: .2em; background: rgba(0, 164, 220, .45); }
+            #experienceManagerPage .em-lay-badge.em-missing { background: rgba(255, 138, 101, .55); }
+            #experienceManagerPage .em-lay-mark { font-size: .8em; font-style: italic; opacity: .85; }
+            #experienceManagerPage .em-lay-panel, #experienceManagerPage .em-lay-add { margin: 1.5em 0; padding: 1em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; max-width: 46em; box-sizing: border-box; }
+            #experienceManagerPage .em-lay-types { list-style: none; padding: 0; }
+            #experienceManagerPage .em-lay-types li { margin: .4em 0; }
+            #experienceManagerPage .em-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
             @media (max-width: 600px) {
                 #experienceManagerPage .em-nav { gap: .8em; }
                 #experienceManagerPage .em-prog-field > span { flex-basis: 100%; }
@@ -93,7 +112,7 @@
                 var page = document.querySelector('#experienceManagerPage');
                 // The admin pages, grouped as the plugin's design has them. Only the built ones open.
                 var groups = [
-                    { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout' }, { id: 'programming', title: 'Programming', built: true }] },
+                    { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout', built: true }, { id: 'programming', title: 'Programming', built: true }] },
                     { title: 'People', pages: [{ id: 'audiences', title: 'Audiences', built: true }, { id: 'defaults', title: 'Group defaults' }] },
                     { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules' }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
@@ -159,6 +178,10 @@
                     }
                     if (current === 'programming') {
                         drawScript(panel, 'admin-programming.js', 'ExperienceManagerProgramming');
+                        return;
+                    }
+                    if (current === 'layout') {
+                        drawScript(panel, 'admin-layout.js', 'ExperienceManagerLayout');
                         return;
                     }
                     if (current === 'audiences') {

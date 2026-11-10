@@ -58,7 +58,8 @@ public sealed record AdminAudienceOrderRequest(IReadOnlyList<string>? Ids);
 /// <param name="Title">Its title, or null for the type's own.</param>
 /// <param name="Config">Its settings.</param>
 /// <param name="Mark"><c>inherited</c>, <c>changed</c>, <c>added</c> (only in the group) or <c>removed</c>.</param>
-public sealed record AdminGroupSection(string Id, string Type, string? Title, System.Text.Json.Nodes.JsonObject? Config, string Mark);
+/// <param name="Off">Whether it is switched off.</param>
+public sealed record AdminGroupSection(string Id, string Type, string? Title, System.Text.Json.Nodes.JsonObject? Config, string Mark, bool Off);
 
 /// <summary>
 /// A group's layout of a page.
@@ -259,7 +260,7 @@ public class AdminAudiencesController : ControllerBase
             page.Id,
             layout is not null,
             layout?.Revision ?? 0,
-            marked.Select(m => new AdminGroupSection(m.Section.Id, m.Section.Type, m.Section.Title, m.Section.Config, m.Mark)).ToList());
+            marked.Select(m => new AdminGroupSection(m.Section.Id, m.Section.Type, m.Section.Title, m.Section.Config, m.Mark, m.Section.Off)).ToList());
     }
 
     private string? UnknownMember(IReadOnlyList<Guid>? members) =>

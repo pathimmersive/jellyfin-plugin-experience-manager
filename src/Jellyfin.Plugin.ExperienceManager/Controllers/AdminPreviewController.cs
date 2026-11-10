@@ -28,7 +28,14 @@ public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event, str
 public sealed record AdminPreviewResponse(string At, IReadOnlyList<string> Events, IReadOnlyList<PreviewSection> Sections, IReadOnlyList<PreviewHidden> Hidden);
 
 /// <summary>
-/// Previews a page at a moment, as the signed-in admin would see it. Administrators only; nothing is stored.
+/// A layout's badges.
+/// </summary>
+/// <param name="Badges">One per section and thing to say about it.</param>
+public sealed record AdminBadgesResponse(IReadOnlyList<SectionBadge> Badges);
+
+/// <summary>
+/// Previews a page at a moment, as the signed-in admin would see it, and says what the layout editor shows on each
+/// section. Administrators only; nothing is stored.
 /// </summary>
 [ApiController]
 [Route(AdminController.Route + "/Pages")]
@@ -51,6 +58,18 @@ public class AdminPreviewController : ControllerBase
         _events = events;
         _users = users;
     }
+
+    /// <summary>
+    /// Gets the badges for a layout's sections now: the event adding, changing or hiding each, and Source missing.
+    /// </summary>
+    /// <param name="pageId">The page id; <c>home</c> is the only page.</param>
+    /// <param name="audience">The audience whose layout it is; Everyone's when left out.</param>
+    /// <returns>The badges.</returns>
+    [HttpGet("{pageId}/Badges")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<AdminBadgesResponse> GetBadges([FromRoute] string pageId, [FromQuery] string? audience) =>
+        _pages.LayoutVersion(pageId) is null ? NotFound() : new AdminBadgesResponse(_pages.Badges(pageId, audience));
 
     /// <summary>
     /// Previews a page at a local date and time with the published events on then, and the event being edited.

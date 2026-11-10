@@ -32,6 +32,15 @@ public sealed record PreviewSection(string Id, string Title, string Source, stri
 public sealed record PreviewHidden(string Id, string Title, string Event);
 
 /// <summary>
+/// Something the layout editor shows on a section's card.
+/// </summary>
+/// <param name="Id">The section's id.</param>
+/// <param name="Kind"><c>event</c> or <c>source-missing</c>.</param>
+/// <param name="Text">What the badge says.</param>
+/// <param name="Title">The section's own title, if it has one; an event's added section is not in the layout.</param>
+public sealed record SectionBadge(string Id, string Kind, string Text, string? Title = null);
+
+/// <summary>
 /// The pages stored in the plugin's database, each resolved for the user: their audience's layout or the server's,
 /// Latest for each library as one section per movie and show library the user can see, in the user's library order,
 /// then Home's events on now for the user's audiences laid over it.
@@ -141,6 +150,48 @@ public sealed class StoredPages : IPages
         return sections;
     }
 
+    /// <summary>
+    /// Gets the badges for a layout's sections now: the event adding, changing or hiding each one, in the server's
+    /// time zone, and Source missing where its library or collection no longer exists.
+    /// </summary>
+    /// <param name="pageId">The page id.</param>
+    /// <param name="audience">The audience whose layout it is, or null for Everyone's.</param>
+    /// <returns>The badges, or none if there is no such page.</returns>
+    public IReadOnlyList<SectionBadge> Badges(string pageId, string? audience)
+    {
+        var page = _store.Get(pageId);
+        if (page is null)
+        {
+            return [];
+        }
+
+        IReadOnlyList<string> audiences = audience is null || audience == EventAudiences.Everyone ? [] : [audience];
+        var layout = LayoutOf(page, audiences);
+        var gone = new List<HiddenSection>();
+        var slots = EventOverlay.Apply(layout.Sections.Where(s => !s.Off).ToList(), ForAudiences(Active(page.Id, null), audiences).Events, gone);
+        var badges = slots
+            .Where(s => s.Event is not null)
+            .Select(s => new SectionBadge(s.Section.Id, "event", (s.Change == ChangeKinds.Insert ? "Added by " : "Changed by ") + s.Event, s.Section.Title))
+            .Concat(gone.Select(h => new SectionBadge(h.Id, "event", "Hidden by " + h.Event)))
+            .ToList();
+        foreach (var section in layout.Sections)
+        {
+            var config = new SectionConfig(section.Config);
+            var source = section.Type switch
+            {
+                SectionTypes.Latest or SectionTypes.Query => config.Guid("Library"),
+                SectionTypes.Collection => config.Guid("Collection"),
+                _ => null,
+            };
+            if (source is { } id && !_cache.Exists(id))
+            {
+                badges.Add(new SectionBadge(section.Id, "source-missing", "Source missing"));
+            }
+        }
+
+        return badges;
+    }
+
     private static bool Applies(ProgrammedEvent value, IReadOnlyList<string> audiences) =>
         value.Audience == EventAudiences.Everyone || audiences.Contains(value.Audience, StringComparer.OrdinalIgnoreCase);
 
@@ -164,7 +215,7 @@ public sealed class StoredPages : IPages
     private static List<StoredSection> Expand(IReadOnlyList<StoredSection> sections, Lazy<IReadOnlyList<LibraryView>> views)
     {
         var expanded = new List<StoredSection>();
-        foreach (var stored in sections)
+        foreach (var stored in sections.Where(s => !s.Off))
         {
             if (stored.Type == SectionTypes.LatestLibraries)
             {
