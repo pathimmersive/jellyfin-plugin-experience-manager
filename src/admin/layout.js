@@ -17,6 +17,19 @@
 
     var MARKS = { inherited: 'Inherited', changed: 'Changed in ', added: 'Only in ', removed: 'Removed in ' };
 
+    // The content rules a section can opt out of, as Rules > Content rules names them.
+    var RULES = [
+        { id: 'tags', name: 'Exclude tags' }, { id: 'ceiling', name: 'Rating ceiling for featuring' }, { id: 'feature-art', name: 'Artwork for features' },
+        { id: 'poster', name: 'Require a poster' }, { id: 'versions', name: 'Collapse versions' }, { id: 'continue-cleanup', name: 'Continue Watching clean-up' }
+    ];
+
+    // A section's opt-outs after the admin ticks or unticks a rule it follows.
+    function rulesOff(current, rule, follows) {
+        var list = (current || []).filter(function (r) { return r !== rule; });
+        if (!follows) list.push(rule);
+        return list;
+    }
+
     function typeOf(type) {
         for (var i = 0; i < TYPES.length; i++) if (TYPES[i].type === type) return TYPES[i];
         return { type: type, name: type, about: '' };
@@ -145,7 +158,7 @@
     var pure = {
         TYPES: TYPES, typeOf: typeOf, titleOf: titleOf, move: move, announce: announce, keyAction: keyAction, entries: entries,
         makeOwn: makeOwn, useEveryones: useEveryones, remove: remove, newSection: newSection, hasLatestLibraries: hasLatestLibraries,
-        changes: changes, slug: slug
+        changes: changes, slug: slug, RULES: RULES, rulesOff: rulesOff
     };
 
     if (typeof module !== 'undefined' && module.exports) {
@@ -509,6 +522,21 @@
             hide.checked = !!configValue(s.Config, 'HideWatched');
             hide.addEventListener('change', function () { setConfig(s, 'HideWatched', hide.checked || undefined); edited(row, true); });
         }
+        var follows = panel.appendChild(el('fieldset', null, 'em-lay-rules'));
+        follows.appendChild(el('legend', 'Content rules this section follows'));
+        RULES.forEach(function (rule) {
+            var label = follows.appendChild(el('label'));
+            var box = label.appendChild(input('checkbox', 'rule'));
+            box.value = rule.id;
+            box.setAttribute('data-rule', rule.id);
+            box.checked = (configValue(s.Config, 'RulesOff') || []).indexOf(rule.id) < 0;
+            box.addEventListener('change', function () {
+                var off = rulesOff(configValue(s.Config, 'RulesOff'), rule.id, box.checked);
+                setConfig(s, 'RulesOff', off.length ? off : undefined);
+                edited(row, true);
+            });
+            label.appendChild(el('span', ' ' + rule.name));
+        });
         var schedule = panel.appendChild(el('p', 'Always shown. ', 'em-muted'));
         schedule.appendChild(button('Add it to an event…', 'em-lay-to-event', function () {
             var nav = document.querySelector('#experienceManagerPage .em-nav-page[data-page="programming"]');

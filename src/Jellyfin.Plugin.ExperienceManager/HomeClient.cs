@@ -55,6 +55,13 @@ public class HomeClient
 
     private static readonly Lazy<string> _layoutScriptETag = new(() => ComputeETag(LayoutScriptFileName));
 
+    /// <summary>
+    /// The admin page's Content rules script, served beside the home client.
+    /// </summary>
+    public const string RulesScriptFileName = "admin-rules.js";
+
+    private static readonly Lazy<string> _rulesScriptETag = new(() => ComputeETag(RulesScriptFileName));
+
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
     private static readonly Lazy<string> _styleETag = new(() => ComputeETag(StyleFileName));
@@ -112,6 +119,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script.</returns>
     public Stream OpenLayoutScript() => OpenResource(LayoutScriptFileName);
+
+    /// <summary>
+    /// Gets the admin Content rules script's entity tag, from its content.
+    /// </summary>
+    public string RulesScriptETag => _rulesScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin Content rules script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenRulesScript() => OpenResource(RulesScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

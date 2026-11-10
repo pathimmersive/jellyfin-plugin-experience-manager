@@ -8,6 +8,7 @@ using Jellyfin.Plugin.ExperienceManager.Layouts;
 using Jellyfin.Plugin.ExperienceManager.Native;
 using Jellyfin.Plugin.ExperienceManager.Native.Adapters;
 using Jellyfin.Plugin.ExperienceManager.Programming;
+using Jellyfin.Plugin.ExperienceManager.Rules;
 using Jellyfin.Plugin.ExperienceManager.Tasks;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
@@ -39,6 +40,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IEventConsumer<UserCreatedEventArgs>, UserCreatedRecorder>();
         serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, UserDeletedRecorder>();
         serviceCollection.AddSingleton<EventStore>();
+        serviceCollection.AddSingleton<RulesStore>();
+        serviceCollection.AddSingleton<RuleFilter>();
         serviceCollection.AddSingleton<EventTimeline>();
         serviceCollection.AddSingleton<StoredPages>();
         serviceCollection.AddSingleton<IPages>(services => services.GetRequiredService<StoredPages>());

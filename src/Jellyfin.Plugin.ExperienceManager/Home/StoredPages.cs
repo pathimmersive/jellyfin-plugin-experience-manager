@@ -8,6 +8,7 @@ using Jellyfin.Plugin.ExperienceManager.Audiences;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Layouts;
 using Jellyfin.Plugin.ExperienceManager.Programming;
+using Jellyfin.Plugin.ExperienceManager.Rules;
 using MediaBrowser.Controller.Entities;
 
 namespace Jellyfin.Plugin.ExperienceManager.Home;
@@ -56,6 +57,7 @@ public sealed class StoredPages : IPages
     private readonly PageStore _store;
     private readonly EventTimeline _events;
     private readonly AudienceResolver? _audiences;
+    private readonly RuleFilter? _rules;
     private readonly HomeCache _cache;
     private readonly IHomeSources _sources;
     private readonly TimeProvider _time;
@@ -66,18 +68,20 @@ public sealed class StoredPages : IPages
     /// <param name="store">The stored pages.</param>
     /// <param name="events">Which of Home's events are on.</param>
     /// <param name="audiences">The user's audiences and their layouts.</param>
+    /// <param name="rules">The content rules.</param>
     /// <param name="cache">The home cache.</param>
     /// <param name="sources">The user's libraries and what they may see.</param>
-    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, HomeCache cache, IHomeSources sources)
-        : this(store, events, cache, sources, TimeProvider.System, audiences)
+    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, HomeCache cache, IHomeSources sources)
+        : this(store, events, cache, sources, TimeProvider.System, audiences, rules)
     {
     }
 
-    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null)
+    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null)
     {
         _store = store;
         _events = events;
         _audiences = audiences;
+        _rules = rules;
         _cache = cache;
         _sources = sources;
         _time = time;
@@ -97,6 +101,7 @@ public sealed class StoredPages : IPages
         var key = ForAudiences(Active(page.Id, utcOffset), audiences).Key;
         return page.LayoutVersion
             + (layout.AudienceId is null ? string.Empty : "-g" + layout.AudienceId + "." + layout.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            + (_rules is { Revision: > 1 } ? "-c" + _rules.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty)
             + (key.Length == 0 ? string.Empty : "-e" + key);
     }
 
@@ -192,6 +197,16 @@ public sealed class StoredPages : IPages
         return badges;
     }
 
+    // The content rules run on the items the section loaded, for the viewer's audiences.
+    private Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Ruled(RuleTarget target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> load) =>
+        _rules is null
+            ? load
+            : u =>
+            {
+                var (items, hit) = load(u);
+                return (_rules.Apply(target, u, AudiencesOf(u), items), hit);
+            };
+
     private static bool Applies(ProgrammedEvent value, IReadOnlyList<string> audiences) =>
         value.Audience == EventAudiences.Everyone || audiences.Contains(value.Audience, StringComparer.OrdinalIgnoreCase);
 
@@ -212,6 +227,19 @@ public sealed class StoredPages : IPages
     private ResolvedLayout LayoutOf(StoredPage page, IReadOnlyList<string> audiences) =>
         _audiences is null ? new ResolvedLayout(null, 0, page.Sections) : _audiences.LayoutFor(page, audiences);
 
+    // Each library's Latest keeps the instance's opt-outs from the content rules.
+    private static JsonObject LibraryConfig(Guid library, JsonObject? instance)
+    {
+        var config = new JsonObject { ["Library"] = library.ToString("N") };
+        var off = new SectionConfig(instance).Strings("RulesOff");
+        if (off.Count > 0)
+        {
+            config["RulesOff"] = new JsonArray(off.Select(r => (JsonNode?)JsonValue.Create(r)).ToArray());
+        }
+
+        return config;
+    }
+
     private static List<StoredSection> Expand(IReadOnlyList<StoredSection> sections, Lazy<IReadOnlyList<LibraryView>> views)
     {
         var expanded = new List<StoredSection>();
@@ -221,7 +249,7 @@ public sealed class StoredPages : IPages
             {
                 expanded.AddRange(views.Value
                     .Where(v => v.Type is CollectionType.movies or CollectionType.tvshows)
-                    .Select(v => new StoredSection("latest-" + v.Id.ToString("N"), SectionTypes.Latest, null, new JsonObject { ["Library"] = v.Id.ToString("N") })));
+                    .Select(v => new StoredSection("latest-" + v.Id.ToString("N"), SectionTypes.Latest, null, LibraryConfig(v.Id, stored.Config))));
             }
             else
             {
@@ -242,10 +270,13 @@ public sealed class StoredPages : IPages
         var row = new SectionDisplay("row", "landscape");
         var poster = new SectionDisplay("row", "portrait");
         var feature = new SectionDisplay("feature", "landscape");
-        PageSection Section(string title, SectionDisplay display, SectionSource source, SeeAllTarget? seeAll, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> load) =>
-            slot.Feature
-                ? new(stored.Id, title, feature, source, seeAll, FeaturedCount, load)
-                : new(stored.Id, title, display, source, seeAll, RowCount, load);
+        PageSection Section(string title, SectionDisplay display, SectionSource source, SeeAllTarget? seeAll, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> load)
+        {
+            var ruled = Ruled(new RuleTarget(stored.Type, slot.Feature, config.Strings("RulesOff")), load);
+            return slot.Feature
+                ? new(stored.Id, title, feature, source, seeAll, FeaturedCount, ruled)
+                : new(stored.Id, title, display, source, seeAll, RowCount, ruled);
+        }
 
         switch (stored.Type)
         {
