@@ -158,6 +158,11 @@
         return copy;
     }
 
+    // The viewer's UTC offset in minutes east of UTC, which decides which of the server's scheduled events are on.
+    function utcOffset(date) {
+        return -date.getTimezoneOffset();
+    }
+
     function isUserSettings(url) {
         return /\/DisplayPreferences\/usersettings(\?|$)/i.test(url);
     }
@@ -238,7 +243,7 @@
         SIZES: SIZES, MARKS: MARKS, layoutOf: layoutOf, cardSize: cardSize, captionLines: captionLines, rowHeight: rowHeight,
         imageUrl: imageUrl, cardImage: cardImage, blurHashOf: blurHashOf, captionOf: captionOf, metaOf: metaOf, runtime: runtime,
         detailsHash: detailsHash, libraryHash: libraryHash, overrideHomeSettings: overrideHomeSettings,
-        restoreHomeSettings: restoreHomeSettings, isUserSettings: isUserSettings, decodeBlurHash: decodeBlurHash, decode83: decode83
+        restoreHomeSettings: restoreHomeSettings, isUserSettings: isUserSettings, utcOffset: utcOffset, decodeBlurHash: decodeBlurHash, decode83: decode83
     };
 
     if (typeof module !== 'undefined' && module.exports) {
@@ -310,7 +315,7 @@
         function loadPage() {
             if (!state.page) {
                 state.pageFailed = false;
-                state.page = api('/ExperienceManager/v1/Pages/home?include=items&count=' + INLINE_SECTIONS);
+                state.page = api('/ExperienceManager/v1/Pages/home?include=items&count=' + INLINE_SECTIONS + '&utcOffset=' + utcOffset(new Date()));
                 state.page.then(null, function () { state.pageFailed = true; });
             }
             return state.page;
@@ -606,7 +611,7 @@
         function loadLazyRow(row, sizes, serverId) {
             var section = row.emSection;
             row.emSection = null;
-            api('/ExperienceManager/v1/Sections/' + encodeURIComponent(section.Id) + '/Items?startIndex=0&limit=16').then(function (result) {
+            api('/ExperienceManager/v1/Sections/' + encodeURIComponent(section.Id) + '/Items?startIndex=0&limit=16&utcOffset=' + utcOffset(new Date())).then(function (result) {
                 var strip = row.querySelector('.em-strip');
                 if (strip) row.removeChild(strip);
                 if (!result.Items.length) {

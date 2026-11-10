@@ -117,6 +117,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "utcOffset",
+            "in": "query",
+            "description": "The viewer's UTC offset in minutes east of UTC, which decides which scheduled events are on; the server's time zone when left out.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -235,6 +244,15 @@
             "description": "Whether to include played state and progress.",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "utcOffset",
+            "in": "query",
+            "description": "The viewer's UTC offset in minutes east of UTC, which decides which scheduled events are on; the server's time zone when left out.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],

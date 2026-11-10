@@ -2,9 +2,12 @@ using System;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Home;
 using Jellyfin.Plugin.ExperienceManager.Integration;
+using Jellyfin.Plugin.ExperienceManager.Layouts;
 using Jellyfin.Plugin.ExperienceManager.Native;
 using Jellyfin.Plugin.ExperienceManager.Native.Adapters;
+using Jellyfin.Plugin.ExperienceManager.Programming;
 using Jellyfin.Plugin.ExperienceManager.Tasks;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Model.Tasks;
@@ -26,7 +29,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 
         serviceCollection.AddSingleton<HomeCache>();
         serviceCollection.AddSingleton<IHomeSources, JellyfinHomeSources>();
-        serviceCollection.AddSingleton<IHomePage, FixedHomePage>();
+        serviceCollection.AddSingleton(services => new LayoutDatabase(LayoutDatabase.DefaultPath(services.GetRequiredService<IApplicationPaths>())));
+        serviceCollection.AddSingleton<PageStore>();
+        serviceCollection.AddSingleton<EventStore>();
+        serviceCollection.AddSingleton<EventTimeline>();
+        serviceCollection.AddSingleton<IPages, StoredPages>();
         serviceCollection.AddSingleton<HomePageService>();
         serviceCollection.AddSingleton<IScheduledTask, WarmHomeCacheTask>();
 

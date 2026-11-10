@@ -67,6 +67,7 @@ public class HomeApiController : ControllerBase
     /// <param name="enableImageTypes">The image types to include, as Jellyfin's <c>enableImageTypes</c>.</param>
     /// <param name="imageTypeLimit">How many images of each type.</param>
     /// <param name="enableUserData">Whether to include played state and progress.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes east of UTC, which decides which scheduled events are on; the server's time zone when left out.</param>
     /// <returns>The page, or 304 when the client already has it.</returns>
     [HttpGet("v1/Pages/{pageId}")]
     [Authorize]
@@ -81,7 +82,8 @@ public class HomeApiController : ControllerBase
         [FromQuery] string? fields,
         [FromQuery] string? enableImageTypes,
         [FromQuery] int? imageTypeLimit,
-        [FromQuery] bool? enableUserData)
+        [FromQuery] bool? enableUserData,
+        [FromQuery] int? utcOffset = null)
     {
         var user = SignedInUser();
         if (user is null)
@@ -89,13 +91,13 @@ public class HomeApiController : ControllerBase
             return Forbid();
         }
 
-        if (!string.Equals(pageId, "home", StringComparison.OrdinalIgnoreCase))
+        var itemSections = string.Equals(include, "items", StringComparison.OrdinalIgnoreCase) ? Math.Max(0, count ?? int.MaxValue) : 0;
+        var page = _home.BuildPage(user, pageId, itemSections, Shape(fields, enableImageTypes, imageTypeLimit, enableUserData), utcOffset, out var timings);
+        if (page is null)
         {
             return NotFound();
         }
 
-        var itemSections = string.Equals(include, "items", StringComparison.OrdinalIgnoreCase) ? Math.Max(0, count ?? int.MaxValue) : 0;
-        var page = _home.BuildPage(user, itemSections, Shape(fields, enableImageTypes, imageTypeLimit, enableUserData), out var timings);
         SetServerTiming(timings);
         return WithETag(page);
     }
@@ -110,6 +112,7 @@ public class HomeApiController : ControllerBase
     /// <param name="enableImageTypes">The image types to include.</param>
     /// <param name="imageTypeLimit">How many images of each type.</param>
     /// <param name="enableUserData">Whether to include played state and progress.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes east of UTC, which decides which scheduled events are on; the server's time zone when left out.</param>
     /// <returns>The items, or 404 when the user's page has no such section.</returns>
     [HttpGet("v1/Sections/{sectionId}/Items")]
     [Authorize]
@@ -123,7 +126,8 @@ public class HomeApiController : ControllerBase
         [FromQuery] string? fields,
         [FromQuery] string? enableImageTypes,
         [FromQuery] int? imageTypeLimit,
-        [FromQuery] bool? enableUserData)
+        [FromQuery] bool? enableUserData,
+        [FromQuery] int? utcOffset = null)
     {
         var user = SignedInUser();
         if (user is null)
@@ -135,8 +139,9 @@ public class HomeApiController : ControllerBase
             user,
             sectionId,
             startIndex ?? 0,
-            Math.Clamp(limit ?? FixedHomePage.RowCount, 0, MaxLimit),
+            Math.Clamp(limit ?? StoredPages.RowCount, 0, MaxLimit),
             Shape(fields, enableImageTypes, imageTypeLimit, enableUserData),
+            utcOffset,
             out var timing);
         if (items is null)
         {
