@@ -125,7 +125,7 @@ public sealed class StoredPagesTests : IDisposable
         var tv = Substitute.For<ITVSeriesManager>();
         tv.GetNextUp(Arg.Any<NextUpQuery>(), Arg.Any<DtoOptions>()).Returns(new QueryResult<BaseItem>());
         cache = new HomeCache(_library, tv, Substitute.For<IUserDataManager>(), _time);
-        return new StoredPages(_db.Store(), cache, _sources, _time);
+        return new StoredPages(_db.Store(), _db.Timeline(_time), cache, _sources, _time);
     }
 
     private IReadOnlyList<PageSection> Home(out HomeCache cache) => Pages(out cache).SectionsFor(PageIds.Home, Viewer);
@@ -222,7 +222,7 @@ public sealed class StoredPagesTests : IDisposable
     {
         _sources.GetViews(Viewer).Returns([]);
         var store = _db.Store();
-        var pages = new StoredPages(store, new HomeCache(_library, Substitute.For<ITVSeriesManager>(), Substitute.For<IUserDataManager>(), _time), _sources, _time);
+        var pages = new StoredPages(store, _db.Timeline(_time), new HomeCache(_library, Substitute.For<ITVSeriesManager>(), Substitute.For<IUserDataManager>(), _time), _sources, _time);
         var before = pages.LayoutVersion(PageIds.Home);
 
         store.Replace(PageIds.Home, [new("nextup", SectionTypes.NextUp, "Up next"), new("featured", SectionTypes.Featured)], out _);

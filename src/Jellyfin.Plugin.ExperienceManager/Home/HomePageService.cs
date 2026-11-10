@@ -65,18 +65,19 @@ public sealed partial class HomePageService
     /// <param name="pageId">The page id.</param>
     /// <param name="itemSections">How many sections, from the top, carry their first items inline.</param>
     /// <param name="shape">The item shape the client asked for.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes, or null for the server's time zone.</param>
     /// <param name="timings">Each section's timing.</param>
     /// <returns>The page, or null if there is no such page.</returns>
-    public PageResponse? BuildPage(User user, string pageId, int itemSections, ItemShape shape, out IReadOnlyList<SectionTiming> timings)
+    public PageResponse? BuildPage(User user, string pageId, int itemSections, ItemShape shape, int? utcOffset, out IReadOnlyList<SectionTiming> timings)
     {
-        var layoutVersion = _pages.LayoutVersion(pageId);
+        var layoutVersion = _pages.LayoutVersion(pageId, utcOffset);
         if (layoutVersion is null)
         {
             timings = [];
             return null;
         }
 
-        var sections = _pages.SectionsFor(pageId, user);
+        var sections = _pages.SectionsFor(pageId, user, utcOffset);
         var built = new SectionResponse[sections.Count];
         var measured = new SectionTiming?[sections.Count];
 
@@ -121,11 +122,12 @@ public sealed partial class HomePageService
     /// <param name="startIndex">The first item.</param>
     /// <param name="limit">How many items.</param>
     /// <param name="shape">The item shape the client asked for.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes, or null for the server's time zone.</param>
     /// <param name="timing">The section's timing.</param>
     /// <returns>The items, or null when the user's Home has no such section.</returns>
-    public QueryResult<BaseItemDto>? GetItems(User user, string sectionId, int startIndex, int limit, ItemShape shape, out SectionTiming? timing)
+    public QueryResult<BaseItemDto>? GetItems(User user, string sectionId, int startIndex, int limit, ItemShape shape, int? utcOffset, out SectionTiming? timing)
     {
-        var section = _pages.SectionsFor(PageIds.Home, user).FirstOrDefault(s => string.Equals(s.Id, sectionId, StringComparison.OrdinalIgnoreCase));
+        var section = _pages.SectionsFor(PageIds.Home, user, utcOffset).FirstOrDefault(s => string.Equals(s.Id, sectionId, StringComparison.OrdinalIgnoreCase));
         if (section is null)
         {
             timing = null;

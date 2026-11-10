@@ -6,7 +6,7 @@ Experience Manager is a Jellyfin server plugin that gives server admins control 
 
 ## Status
 
-Early development; there is no release yet. The plugin draws a first version of its home screen in jellyfin-web. Home is stored in the plugin's own database, starting as a featured banner, My Media, Continue Watching, Next Up and Latest. The admin page cannot edit it yet; an admin-only route can.
+Early development; there is no release yet. The plugin draws a first version of its home screen in jellyfin-web. Home is stored in the plugin's own database, starting as a featured banner, My Media, Continue Watching, Next Up and Latest. Scheduled events, such as a Christmas row, overlay it for a while. The admin page cannot edit either yet; admin-only routes can.
 
 ## Home API
 

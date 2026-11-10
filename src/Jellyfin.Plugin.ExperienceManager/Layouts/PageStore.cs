@@ -140,6 +140,11 @@ public sealed class PageStore
             {
                 return $"section {section.Id} has an unknown type '{section.Type}'";
             }
+
+            if (SectionTypes.ValidateConfig(section) is { } config)
+            {
+                return config;
+            }
         }
 
         var duplicate = sections.GroupBy(s => s.Id, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);

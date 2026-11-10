@@ -48,6 +48,7 @@ public sealed class LayoutDatabase
                 PRIMARY KEY (layout_id, id)
             );
             """),
+        Programming.EventStore.Migration,
     ];
 
     private readonly string _connectionString;

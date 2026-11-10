@@ -45,7 +45,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("featured", 5, "feature"), Section("continue", 2), Section("latest", 10));
 
-        var page = service.BuildPage(Viewer, "home", 2, ItemShape.Default, out var timings)!;
+        var page = service.BuildPage(Viewer, "home", 2, ItemShape.Default, null, out var timings)!;
 
         Assert.Equal("test-1", page.LayoutVersion);
         Assert.Equal(["featured", "continue", "latest"], page.Sections.Select(s => s.Id));
@@ -62,7 +62,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("featured", 5), Section("continue", 0, load: _ => throw new InvalidOperationException("broken")), Section("latest", 4));
 
-        var page = service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, out _)!;
+        var page = service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, null, out _)!;
 
         Assert.Equal("unavailable", page.Sections[1].Error);
         Assert.Null(page.Sections[1].Items);
@@ -75,7 +75,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("a", 10), Section("b", 10), Section("c", 10));
 
-        service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, out _);
+        service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, null, out _);
 
         _dto.ReceivedWithAnyArgs(3).GetBaseItemDtos(default!, default!, default, default);
     }
@@ -85,7 +85,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("latest", 10));
 
-        var items = service.GetItems(Viewer, "latest", 4, 3, ItemShape.Default, out var timing);
+        var items = service.GetItems(Viewer, "latest", 4, 3, ItemShape.Default, null, out var timing);
 
         Assert.NotNull(items);
         Assert.Equal(4, items.StartIndex);
@@ -97,7 +97,7 @@ public class HomePageServiceTests
     [Fact]
     public void AnUnknownSectionHasNoItems()
     {
-        Assert.Null(Service(Section("latest", 10)).GetItems(Viewer, "nope", 0, 10, ItemShape.Default, out _));
+        Assert.Null(Service(Section("latest", 10)).GetItems(Viewer, "nope", 0, 10, ItemShape.Default, null, out _));
     }
 
     [Fact]

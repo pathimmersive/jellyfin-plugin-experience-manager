@@ -100,6 +100,14 @@ test('BlurHashes decode to their average colour', () => {
     assert.throws(() => home.decodeBlurHash('not a hash!', w, h));
 });
 
+test('the client sends the viewer\'s UTC offset on every home API call, in minutes east of UTC', () => {
+    assert.equal(home.utcOffset({ getTimezoneOffset: () => 300 }), -300);
+    assert.equal(home.utcOffset({ getTimezoneOffset: () => -60 }), 60);
+    const calls = read('src/home/home.js').match(/api\('\/ExperienceManager\/v1\/[^;]*/g);
+    assert.equal(calls.length, 2);
+    for (const call of calls) assert.match(call, /utcOffset=' \+ utcOffset\(new Date\(\)\)/, call);
+});
+
 test('the client reads the home screen from the public v1 API only', () => {
     const routes = read('src/home/home.js').match(/\/ExperienceManager\/[^'"?]*/g);
     assert.ok(routes.length > 0);

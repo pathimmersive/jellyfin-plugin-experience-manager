@@ -50,6 +50,8 @@ Each section has:
 
 The page call takes Jellyfin's own item parameters, `fields`, `enableImageTypes`, `imageTypeLimit` and `enableUserData`, and applies them to every inlined section.
 
+The admin can schedule events that change the page for a while, such as a holiday row. Send `utcOffset`, the viewer's offset from UTC in minutes east (`-300` for New York in winter, `60` for Paris), on the page call and on section items, so events start and end in the viewer's local time. Without it, the server's time zone is used.
+
 ## 3. Page a section
 
 `GET /ExperienceManager/v1/Sections/{sectionId}/Items` returns one section's items, paged with `startIndex` and `limit` (16 by default, at most 100). Load a section that came without items as it nears the screen, and the next page as the user scrolls along a row.
@@ -60,7 +62,7 @@ curl -sf -H "Authorization: MediaBrowser Token=\"$TOKEN\"" \
 # {"Items":[...],"TotalRecordCount":3,"StartIndex":0}
 ```
 
-A 404 means the section is not on this user's page, for example after the admin changed the layout: reload the page.
+A 404 means the section is not on this user's page, for example after the admin changed the layout or an event ended: reload the page.
 
 ## 4. Draw it
 
@@ -93,7 +95,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: MediaBrowser Token=\
 # 304
 ```
 
-The page's `LayoutVersion` changes whenever the layout changes, which tells a client that caches pages between sessions when to drop them.
+The page's `LayoutVersion` changes whenever the layout or the events on it change, which tells a client that caches pages between sessions when to drop them.
 
 ## Versioning
 

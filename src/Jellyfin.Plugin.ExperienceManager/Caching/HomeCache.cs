@@ -16,6 +16,26 @@ using MediaBrowser.Model.Querying;
 namespace Jellyfin.Plugin.ExperienceManager.Caching;
 
 /// <summary>
+/// A library query by genre or tag, as a section stores it.
+/// </summary>
+/// <param name="Library">The library to look in, or null for all.</param>
+/// <param name="Genres">Items with any of these genres.</param>
+/// <param name="Tags">Items with any of these tags.</param>
+/// <param name="ItemTypes">The item kinds; none for films and shows.</param>
+public sealed record LibraryQuery(Guid? Library, IReadOnlyList<string> Genres, IReadOnlyList<string> Tags, IReadOnlyList<BaseItemKind> ItemTypes)
+{
+    /// <summary>
+    /// Gets the query as one string, the same for the same query.
+    /// </summary>
+    public string Key => string.Join(
+        "|",
+        Library?.ToString("N") ?? string.Empty,
+        string.Join(",", Genres.Select(g => g.ToLowerInvariant()).Order(StringComparer.Ordinal)),
+        string.Join(",", Tags.Select(t => t.ToLowerInvariant()).Order(StringComparer.Ordinal)),
+        string.Join(",", ItemTypes.Order()));
+}
+
+/// <summary>
 /// The home page's data. Lists that are the same for everyone (featured candidates, Latest per
 /// library) are built once and filtered per user at request time; lists that differ per user
 /// (Continue Watching, Next Up) are kept per user and dropped when that user's watch data changes.
@@ -43,6 +63,7 @@ public sealed class HomeCache : IDisposable
     private readonly TimeProvider _time;
     private readonly SharedList<BaseItem> _featured;
     private readonly ConcurrentDictionary<Guid, SharedList<BaseItem>> _latest = new();
+    private readonly ConcurrentDictionary<string, SharedList<BaseItem>> _sources = new();
     private readonly ConcurrentDictionary<Guid, (DateTimeOffset At, IReadOnlyList<BaseItem> Items)> _resume = new();
     private readonly ConcurrentDictionary<Guid, (DateTimeOffset At, IReadOnlyList<BaseItem> Items)> _nextUp = new();
 
@@ -88,6 +109,48 @@ public sealed class HomeCache : IDisposable
         _latest.GetOrAdd(libraryId, id => new SharedList<BaseItem>(() => BuildLatest(id, type), SharedMaxAge, Debounce, _time)).Get(out hit);
 
     /// <summary>
+    /// Gets the items a library query finds, shared by every user and refreshed as the library changes.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="hit">Whether the items came from the cache.</param>
+    /// <returns>The items, by name.</returns>
+    public IReadOnlyList<BaseItem> Query(LibraryQuery query, out bool hit) =>
+        Shared("query:" + query.Key, () => BuildQuery(query), out hit);
+
+    /// <summary>
+    /// Gets a collection's or playlist's items in their own order, shared by every user.
+    /// </summary>
+    /// <param name="collectionId">The collection or playlist.</param>
+    /// <param name="hit">Whether the items came from the cache.</param>
+    /// <returns>The items.</returns>
+    public IReadOnlyList<BaseItem> Collection(Guid collectionId, out bool hit) =>
+        Shared("collection:" + collectionId.ToString("N"), () => (_library.GetItemById(collectionId) as Folder)?.GetLinkedChildren().Take(SharedLimit).ToList() ?? [], out hit);
+
+    /// <summary>
+    /// Gets an item's name.
+    /// </summary>
+    /// <param name="id">The item.</param>
+    /// <returns>Its name, or null if there is no such item.</returns>
+    public string? ItemName(Guid id) => _library.GetItemById(id)?.Name;
+
+    /// <summary>
+    /// Leaves out the items a user has watched: those marked played for them.
+    /// </summary>
+    /// <param name="user">The user.</param>
+    /// <param name="items">The items.</param>
+    /// <returns>The items the user has not watched, in order.</returns>
+    public IReadOnlyList<BaseItem> Unwatched(User user, IReadOnlyList<BaseItem> items)
+    {
+        if (items.Count == 0)
+        {
+            return items;
+        }
+
+        var data = _userData.GetUserDataBatch(items, user);
+        return items.Where(i => data.GetValueOrDefault(i.Id)?.Played != true).ToList();
+    }
+
+    /// <summary>
     /// Gets what the user has started and not finished, most recently played first.
     /// </summary>
     /// <param name="user">The user.</param>
@@ -129,7 +192,7 @@ public sealed class HomeCache : IDisposable
         _library.ItemUpdated -= OnLibraryChanged;
         _userData.UserDataSaved -= OnUserDataSaved;
         _featured.Dispose();
-        foreach (var list in _latest.Values)
+        foreach (var list in _latest.Values.Concat(_sources.Values))
         {
             list.Dispose();
         }
@@ -193,6 +256,29 @@ public sealed class HomeCache : IDisposable
                 Limit = SharedLimit,
             });
 
+    private IReadOnlyList<BaseItem> Shared(string key, Func<IReadOnlyList<BaseItem>> build, out bool hit) =>
+        _sources.GetOrAdd(key, _ => new SharedList<BaseItem>(build, SharedMaxAge, Debounce, _time)).Get(out hit);
+
+    private IReadOnlyList<BaseItem> BuildQuery(LibraryQuery query)
+    {
+        var items = new InternalItemsQuery
+        {
+            Recursive = true,
+            Genres = query.Genres.ToArray(),
+            Tags = query.Tags.ToArray(),
+            IncludeItemTypes = query.ItemTypes.Count > 0 ? query.ItemTypes.ToArray() : [BaseItemKind.Movie, BaseItemKind.Series],
+            IsVirtualItem = false,
+            OrderBy = [(ItemSortBy.SortName, SortOrder.Ascending)],
+            Limit = SharedLimit,
+        };
+        if (query.Library is { } library)
+        {
+            items.ParentId = library;
+        }
+
+        return _library.GetItemList(items);
+    }
+
     private IReadOnlyList<BaseItem> BuildResume(User user) =>
         _library.GetItemList(new InternalItemsQuery(user)
         {
@@ -229,7 +315,7 @@ public sealed class HomeCache : IDisposable
     private void OnLibraryChanged(object? sender, ItemChangeEventArgs e)
     {
         _featured.Changed();
-        foreach (var list in _latest.Values)
+        foreach (var list in _latest.Values.Concat(_sources.Values))
         {
             list.Changed();
         }
