@@ -34,6 +34,13 @@ public class HomeClient
     /// </summary>
     public const string StyleContentType = "text/css; charset=utf-8";
 
+    /// <summary>
+    /// The admin page's Programming script, served beside the home client.
+    /// </summary>
+    public const string AdminScriptFileName = "admin-programming.js";
+
+    private static readonly Lazy<string> _adminScriptETag = new(() => ComputeETag(AdminScriptFileName));
+
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
     private static readonly Lazy<string> _styleETag = new(() => ComputeETag(StyleFileName));
@@ -58,6 +65,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script content.</returns>
     public Stream OpenScript() => OpenResource(ScriptFileName);
+
+    /// <summary>
+    /// Gets the admin Programming script's entity tag, from its content.
+    /// </summary>
+    public string AdminScriptETag => _adminScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin Programming script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenAdminScript() => OpenResource(AdminScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

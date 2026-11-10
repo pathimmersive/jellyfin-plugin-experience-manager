@@ -230,12 +230,12 @@ public sealed class EventTests : IDisposable
 
         Assert.Contains("nextup", HomeIds());
         var controller = new AdminEventsController(_events, _pages, _time);
-        Assert.Equal(["Holidays and Movie night both change nextup; Holidays wins, as it is higher in the list."], controller.GetEvents().Value!.Conflicts);
+        Assert.Equal(["Holidays and Movie night both change Next Up; Holidays wins, as it is higher in the list."], controller.GetEvents().Value!.Conflicts);
 
         controller.OrderEvents(new AdminEventOrderRequest(["halloween", "christmas", "movie-night", "holidays", "halloween-party"]));
 
         Assert.DoesNotContain("nextup", HomeIds());
-        Assert.Equal(["Movie night and Holidays both change nextup; Movie night wins, as it is higher in the list."], controller.GetEvents().Value!.Conflicts);
+        Assert.Equal(["Movie night and Holidays both change Next Up; Movie night wins, as it is higher in the list."], controller.GetEvents().Value!.Conflicts);
     }
 
     [Fact]
