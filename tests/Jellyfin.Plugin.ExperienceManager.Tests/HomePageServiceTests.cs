@@ -34,9 +34,9 @@ public class HomePageServiceTests
 
     private HomePageService Service(params PageSection[] sections)
     {
-        var page = Substitute.For<IHomePage>();
-        page.LayoutVersion.Returns("test-1");
-        page.SectionsFor(Arg.Any<User>()).Returns(sections);
+        var page = Substitute.For<IPages>();
+        page.LayoutVersion("home").Returns("test-1");
+        page.SectionsFor("home", Arg.Any<User>()).Returns(sections);
         return new HomePageService(page, _dto, NullLogger<HomePageService>.Instance);
     }
 
@@ -45,7 +45,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("featured", 5, "feature"), Section("continue", 2), Section("latest", 10));
 
-        var page = service.BuildPage(Viewer, 2, ItemShape.Default, out var timings);
+        var page = service.BuildPage(Viewer, "home", 2, ItemShape.Default, out var timings)!;
 
         Assert.Equal("test-1", page.LayoutVersion);
         Assert.Equal(["featured", "continue", "latest"], page.Sections.Select(s => s.Id));
@@ -62,7 +62,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("featured", 5), Section("continue", 0, load: _ => throw new InvalidOperationException("broken")), Section("latest", 4));
 
-        var page = service.BuildPage(Viewer, int.MaxValue, ItemShape.Default, out _);
+        var page = service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, out _)!;
 
         Assert.Equal("unavailable", page.Sections[1].Error);
         Assert.Null(page.Sections[1].Items);
@@ -75,7 +75,7 @@ public class HomePageServiceTests
     {
         var service = Service(Section("a", 10), Section("b", 10), Section("c", 10));
 
-        service.BuildPage(Viewer, int.MaxValue, ItemShape.Default, out _);
+        service.BuildPage(Viewer, "home", int.MaxValue, ItemShape.Default, out _);
 
         _dto.ReceivedWithAnyArgs(3).GetBaseItemDtos(default!, default!, default, default);
     }

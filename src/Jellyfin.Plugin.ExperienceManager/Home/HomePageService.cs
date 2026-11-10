@@ -9,6 +9,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Querying;
+using Jellyfin.Plugin.ExperienceManager.Layouts;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.ExperienceManager.Home;
@@ -40,19 +41,19 @@ public sealed record SectionTiming(string SectionId, bool Hit, double Millisecon
 /// </summary>
 public sealed partial class HomePageService
 {
-    private readonly IHomePage _page;
+    private readonly IPages _pages;
     private readonly IDtoService _dto;
     private readonly ILogger<HomePageService> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HomePageService"/> class.
     /// </summary>
-    /// <param name="page">The page's sections.</param>
+    /// <param name="pages">The pages.</param>
     /// <param name="dto">Jellyfin's DTO service.</param>
     /// <param name="logger">The logger.</param>
-    public HomePageService(IHomePage page, IDtoService dto, ILogger<HomePageService> logger)
+    public HomePageService(IPages pages, IDtoService dto, ILogger<HomePageService> logger)
     {
-        _page = page;
+        _pages = pages;
         _dto = dto;
         _logger = logger;
     }
@@ -61,13 +62,21 @@ public sealed partial class HomePageService
     /// Builds the page for a user. A section whose items fail carries an error; the others are unaffected.
     /// </summary>
     /// <param name="user">The user.</param>
+    /// <param name="pageId">The page id.</param>
     /// <param name="itemSections">How many sections, from the top, carry their first items inline.</param>
     /// <param name="shape">The item shape the client asked for.</param>
     /// <param name="timings">Each section's timing.</param>
-    /// <returns>The page.</returns>
-    public PageResponse BuildPage(User user, int itemSections, ItemShape shape, out IReadOnlyList<SectionTiming> timings)
+    /// <returns>The page, or null if there is no such page.</returns>
+    public PageResponse? BuildPage(User user, string pageId, int itemSections, ItemShape shape, out IReadOnlyList<SectionTiming> timings)
     {
-        var sections = _page.SectionsFor(user);
+        var layoutVersion = _pages.LayoutVersion(pageId);
+        if (layoutVersion is null)
+        {
+            timings = [];
+            return null;
+        }
+
+        var sections = _pages.SectionsFor(pageId, user);
         var built = new SectionResponse[sections.Count];
         var measured = new SectionTiming?[sections.Count];
 
@@ -101,7 +110,7 @@ public sealed partial class HomePageService
         });
 
         timings = measured.OfType<SectionTiming>().ToList();
-        return new PageResponse("home", _page.LayoutVersion, built);
+        return new PageResponse(pageId.ToLowerInvariant(), layoutVersion, built);
     }
 
     /// <summary>
@@ -113,10 +122,10 @@ public sealed partial class HomePageService
     /// <param name="limit">How many items.</param>
     /// <param name="shape">The item shape the client asked for.</param>
     /// <param name="timing">The section's timing.</param>
-    /// <returns>The items, or null when the user's page has no such section.</returns>
+    /// <returns>The items, or null when the user's Home has no such section.</returns>
     public QueryResult<BaseItemDto>? GetItems(User user, string sectionId, int startIndex, int limit, ItemShape shape, out SectionTiming? timing)
     {
-        var section = _page.SectionsFor(user).FirstOrDefault(s => string.Equals(s.Id, sectionId, StringComparison.OrdinalIgnoreCase));
+        var section = _pages.SectionsFor(PageIds.Home, user).FirstOrDefault(s => string.Equals(s.Id, sectionId, StringComparison.OrdinalIgnoreCase));
         if (section is null)
         {
             timing = null;

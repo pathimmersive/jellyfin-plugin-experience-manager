@@ -5,6 +5,7 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Home;
+using Jellyfin.Plugin.ExperienceManager.Layouts;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
@@ -108,24 +109,29 @@ public class HomeCacheTests
     }
 }
 
-public class FixedHomePageTests
+public sealed class StoredPagesTests : IDisposable
 {
+    private readonly TempDatabase _db = new();
     private readonly ILibraryManager _library = Substitute.For<ILibraryManager>();
     private readonly IHomeSources _sources = Substitute.For<IHomeSources>();
     private readonly FakeTimeProvider _time = new();
 
     private static readonly User Viewer = new("viewer", "auth", "reset") { Id = Guid.NewGuid() };
 
-    private FixedHomePage Page(out HomeCache cache)
+    public void Dispose() => _db.Dispose();
+
+    private StoredPages Pages(out HomeCache cache)
     {
         var tv = Substitute.For<ITVSeriesManager>();
         tv.GetNextUp(Arg.Any<NextUpQuery>(), Arg.Any<DtoOptions>()).Returns(new QueryResult<BaseItem>());
         cache = new HomeCache(_library, tv, Substitute.For<IUserDataManager>(), _time);
-        return new FixedHomePage(cache, _sources, _time);
+        return new StoredPages(_db.Store(), cache, _sources, _time);
     }
 
+    private IReadOnlyList<PageSection> Home(out HomeCache cache) => Pages(out cache).SectionsFor(PageIds.Home, Viewer);
+
     [Fact]
-    public void HomeHoldsFeaturedContinueWatchingNextUpThenLatestForEachMovieAndShowLibrary()
+    public void AFreshHomeHoldsFeaturedMyMediaContinueWatchingNextUpThenLatestForEachMovieAndShowLibrary()
     {
         var (films, music, shows) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
         _sources.GetViews(Viewer).Returns(
@@ -135,7 +141,7 @@ public class FixedHomePageTests
             new LibraryView(shows, "Shows", CollectionType.tvshows),
         ]);
 
-        var sections = Page(out var cache).SectionsFor(Viewer);
+        var sections = Home(out var cache);
         using (cache)
         {
             Assert.Equal(["featured", "mymedia", "continue", "nextup", "latest-" + films.ToString("N"), "latest-" + shows.ToString("N")], sections.Select(s => s.Id));
@@ -162,7 +168,7 @@ public class FixedHomePageTests
         var (shows, films) = (new Folder { Id = Guid.NewGuid(), Name = "Shows" }, new Folder { Id = Guid.NewGuid(), Name = "Movies" });
         _sources.GetViews(Viewer).Returns([new LibraryView(shows.Id, "Shows", CollectionType.tvshows, shows), new LibraryView(films.Id, "Movies", CollectionType.movies, films)]);
 
-        var sections = Page(out var cache).SectionsFor(Viewer);
+        var sections = Home(out var cache);
         using (cache)
         {
             var myMedia = sections.Single(s => s.Id == "mymedia");
@@ -182,7 +188,7 @@ public class FixedHomePageTests
         _sources.GetViews(Viewer).Returns([new LibraryView(films, "Movies", CollectionType.movies)]);
         _sources.IsVisible(Arg.Any<BaseItem>(), Viewer).Returns(c => c.Arg<BaseItem>() != hidden);
 
-        var sections = Page(out var cache).SectionsFor(Viewer);
+        var sections = Home(out var cache);
         using (cache)
         {
             foreach (var section in sections)
@@ -191,6 +197,49 @@ public class FixedHomePageTests
             }
 
             Assert.Equal([allowed], sections.Single(s => s.Id.StartsWith("latest-", StringComparison.Ordinal)).Load(Viewer).Items);
+        }
+    }
+
+    [Fact]
+    public void ALibraryAddedLaterGetsItsLatestSectionWithoutAnEdit()
+    {
+        var films = Guid.NewGuid();
+        _sources.GetViews(Viewer).Returns([new LibraryView(films, "Movies", CollectionType.movies)]);
+        var pages = Pages(out var cache);
+        using (cache)
+        {
+            Assert.Single(pages.SectionsFor(PageIds.Home, Viewer), s => s.Id.StartsWith("latest-", StringComparison.Ordinal));
+
+            var shows = Guid.NewGuid();
+            _sources.GetViews(Viewer).Returns([new LibraryView(films, "Movies", CollectionType.movies), new LibraryView(shows, "Shows", CollectionType.tvshows)]);
+
+            Assert.Equal(["latest-" + films.ToString("N"), "latest-" + shows.ToString("N")], pages.SectionsFor(PageIds.Home, Viewer).Select(s => s.Id).Where(id => id.StartsWith("latest-", StringComparison.Ordinal)));
+        }
+    }
+
+    [Fact]
+    public void AnEditedHomeIsServedInItsNewOrderWithItsOwnTitlesAndANewLayoutVersion()
+    {
+        _sources.GetViews(Viewer).Returns([]);
+        var store = _db.Store();
+        var pages = new StoredPages(store, new HomeCache(_library, Substitute.For<ITVSeriesManager>(), Substitute.For<IUserDataManager>(), _time), _sources, _time);
+        var before = pages.LayoutVersion(PageIds.Home);
+
+        store.Replace(PageIds.Home, [new("nextup", SectionTypes.NextUp, "Up next"), new("featured", SectionTypes.Featured)], out _);
+
+        Assert.Equal(["nextup", "featured"], pages.SectionsFor(PageIds.Home, Viewer).Select(s => s.Id));
+        Assert.Equal("Up next", pages.SectionsFor(PageIds.Home, Viewer)[0].Title);
+        Assert.NotEqual(before, pages.LayoutVersion(PageIds.Home));
+    }
+
+    [Fact]
+    public void APageThatIsNotStoredHasNoVersionAndNoSections()
+    {
+        var pages = Pages(out var cache);
+        using (cache)
+        {
+            Assert.Null(pages.LayoutVersion("movies"));
+            Assert.Empty(pages.SectionsFor("movies", Viewer));
         }
     }
 }

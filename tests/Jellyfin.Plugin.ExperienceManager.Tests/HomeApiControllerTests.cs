@@ -26,13 +26,14 @@ public class HomeApiControllerTests
     private static readonly BaseItem Latest = HomePageServiceTests.Film("a");
 
     private readonly IUserManager _users = Substitute.For<IUserManager>();
-    private readonly IHomePage _page = Substitute.For<IHomePage>();
+    private readonly IPages _page = Substitute.For<IPages>();
 
     public HomeApiControllerTests()
     {
         _users.GetUserById(Viewer.Id).Returns(Viewer);
-        _page.LayoutVersion.Returns("test-1");
-        _page.SectionsFor(Viewer).Returns(
+        _page.LayoutVersion(Arg.Any<string>()).Returns((string?)null);
+        _page.LayoutVersion("home").Returns("test-1");
+        _page.SectionsFor("home", Viewer).Returns(
         [
             new PageSection("latest", "Latest", new SectionDisplay("row", "portrait"), new SectionSource(SectionSources.Latest, null, "Movie"), null, 16, _ => ([Latest], true)),
         ]);

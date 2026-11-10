@@ -22,4 +22,5 @@ All notable changes to Experience Manager are listed here. The format follows [K
   - each section's items as Jellyfin's own item type, paged;
   - `/ExperienceManager/Info` for discovery.
 - The home API's contract and an integration guide for client authors, in docs/api/, MIT licensed. Tests keep the contract matching what the plugin serves.
+- Home stored as a page in the plugin's own SQLite database, under the server's data folder, so later pages and scheduled changes build on it. A fresh install starts with the layout above. Administrators can read and replace a page's sections through an admin-only route, which is not part of the public API; a change shows on the next page call with a new layout version.
 - A shared cache behind the home page, kept up to date as libraries and watch progress change, and warmed by a scheduled task when the server starts.

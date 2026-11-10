@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.ExperienceManager.Home;
+using Jellyfin.Plugin.ExperienceManager.Layouts;
 
 namespace Jellyfin.Plugin.ExperienceManager.Native;
 
@@ -29,15 +30,15 @@ public sealed record ResolvedExperience(string PageId, string LayoutVersion, str
 /// </summary>
 public sealed class ExperienceResolver
 {
-    private readonly IHomePage _page;
+    private readonly IPages _pages;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ExperienceResolver"/> class.
     /// </summary>
-    /// <param name="page">The page's sections.</param>
-    public ExperienceResolver(IHomePage page)
+    /// <param name="pages">The pages.</param>
+    public ExperienceResolver(IPages pages)
     {
-        _page = page;
+        _pages = pages;
     }
 
     /// <summary>
@@ -47,8 +48,8 @@ public sealed class ExperienceResolver
     /// <param name="familyId">The client family's id.</param>
     /// <returns>The resolved experience.</returns>
     public ResolvedExperience Resolve(User user, string familyId) => new(
-        "home",
-        _page.LayoutVersion,
+        PageIds.Home,
+        _pages.LayoutVersion(PageIds.Home) ?? string.Empty,
         familyId,
-        _page.SectionsFor(user).Select(s => new ResolvedSection(s.Id, s.Title, s.Display, s.Source, s.SeeAll)).ToList());
+        _pages.SectionsFor(PageIds.Home, user).Select(s => new ResolvedSection(s.Id, s.Title, s.Display, s.Source, s.SeeAll)).ToList());
 }

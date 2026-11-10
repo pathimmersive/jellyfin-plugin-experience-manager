@@ -89,13 +89,13 @@ public class HomeApiController : ControllerBase
             return Forbid();
         }
 
-        if (!string.Equals(pageId, "home", StringComparison.OrdinalIgnoreCase))
+        var itemSections = string.Equals(include, "items", StringComparison.OrdinalIgnoreCase) ? Math.Max(0, count ?? int.MaxValue) : 0;
+        var page = _home.BuildPage(user, pageId, itemSections, Shape(fields, enableImageTypes, imageTypeLimit, enableUserData), out var timings);
+        if (page is null)
         {
             return NotFound();
         }
 
-        var itemSections = string.Equals(include, "items", StringComparison.OrdinalIgnoreCase) ? Math.Max(0, count ?? int.MaxValue) : 0;
-        var page = _home.BuildPage(user, itemSections, Shape(fields, enableImageTypes, imageTypeLimit, enableUserData), out var timings);
         SetServerTiming(timings);
         return WithETag(page);
     }
@@ -135,7 +135,7 @@ public class HomeApiController : ControllerBase
             user,
             sectionId,
             startIndex ?? 0,
-            Math.Clamp(limit ?? FixedHomePage.RowCount, 0, MaxLimit),
+            Math.Clamp(limit ?? StoredPages.RowCount, 0, MaxLimit),
             Shape(fields, enableImageTypes, imageTypeLimit, enableUserData),
             out var timing);
         if (items is null)

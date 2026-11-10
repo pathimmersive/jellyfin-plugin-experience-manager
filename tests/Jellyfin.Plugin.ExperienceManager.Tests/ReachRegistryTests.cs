@@ -111,9 +111,9 @@ public class ReachRegistryTests
     [Fact]
     public void The_resolver_gives_the_sections_in_order_with_display_and_source_without_loading_items()
     {
-        var page = Substitute.For<IHomePage>();
-        page.LayoutVersion.Returns("fixed-1");
-        page.SectionsFor(Viewer).Returns(
+        var page = Substitute.For<IPages>();
+        page.LayoutVersion("home").Returns("r1");
+        page.SectionsFor("home", Viewer).Returns(
         [
             new PageSection("featured", "Featured", new SectionDisplay("feature", "landscape"), new SectionSource(SectionSources.Featured), null, 5, _ => throw new InvalidOperationException("items loaded")),
             new PageSection("latest-x", "Latest Movies", new SectionDisplay("row", "portrait"), new SectionSource(SectionSources.Latest, "x", "Movie"), new SeeAllTarget("x", "Movie", "DateCreated", "Descending", null), 16, _ => throw new InvalidOperationException("items loaded")),
@@ -121,7 +121,7 @@ public class ReachRegistryTests
 
         var resolved = new ExperienceResolver(page).Resolve(Viewer, "moonfin");
 
-        Assert.Equal(("home", "fixed-1", "moonfin"), (resolved.PageId, resolved.LayoutVersion, resolved.FamilyId));
+        Assert.Equal(("home", "r1", "moonfin"), (resolved.PageId, resolved.LayoutVersion, resolved.FamilyId));
         Assert.Equal(["featured", "latest-x"], resolved.Sections.Select(s => s.Id));
         Assert.Equal("feature", resolved.Sections[0].Display.Hint);
         Assert.Equal(new SectionSource(SectionSources.Latest, "x", "Movie"), resolved.Sections[1].Source);
