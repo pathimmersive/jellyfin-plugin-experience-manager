@@ -123,7 +123,7 @@ public sealed class EventTimeline : IDisposable
         return new ActiveEvents(active, KeyOf(active), next is { } t ? Utc(key, t) : null);
     }
 
-    private static string KeyOf(IReadOnlyList<ProgrammedEvent> active) =>
+    internal static string KeyOf(IReadOnlyList<ProgrammedEvent> active) =>
         active.Count == 0 ? string.Empty : Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(active)))[..8];
 
     // The timer fires at the earliest boundary of any set in use and works out the sets that reached it.

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Plugin.ExperienceManager.Audiences;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Layouts;
 using Jellyfin.Plugin.ExperienceManager.Programming;
@@ -31,9 +32,9 @@ public sealed record PreviewSection(string Id, string Title, string Source, stri
 public sealed record PreviewHidden(string Id, string Title, string Event);
 
 /// <summary>
-/// The pages stored in the plugin's database, each resolved for the user: Latest for each library becomes one
-/// section per movie and show library the user can see, in the user's library order, then Home's events on now
-/// are laid over it.
+/// The pages stored in the plugin's database, each resolved for the user: their audience's layout or the server's,
+/// Latest for each library as one section per movie and show library the user can see, in the user's library order,
+/// then Home's events on now for the user's audiences laid over it.
 /// </summary>
 public sealed class StoredPages : IPages
 {
@@ -45,6 +46,7 @@ public sealed class StoredPages : IPages
 
     private readonly PageStore _store;
     private readonly EventTimeline _events;
+    private readonly AudienceResolver? _audiences;
     private readonly HomeCache _cache;
     private readonly IHomeSources _sources;
     private readonly TimeProvider _time;
@@ -54,24 +56,26 @@ public sealed class StoredPages : IPages
     /// </summary>
     /// <param name="store">The stored pages.</param>
     /// <param name="events">Which of Home's events are on.</param>
+    /// <param name="audiences">The user's audiences and their layouts.</param>
     /// <param name="cache">The home cache.</param>
     /// <param name="sources">The user's libraries and what they may see.</param>
-    public StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources)
-        : this(store, events, cache, sources, TimeProvider.System)
+    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, HomeCache cache, IHomeSources sources)
+        : this(store, events, cache, sources, TimeProvider.System, audiences)
     {
     }
 
-    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time)
+    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null)
     {
         _store = store;
         _events = events;
+        _audiences = audiences;
         _cache = cache;
         _sources = sources;
         _time = time;
     }
 
     /// <inheritdoc />
-    public string? LayoutVersion(string pageId, int? utcOffset = null)
+    public string? LayoutVersion(string pageId, int? utcOffset = null, User? user = null)
     {
         var page = _store.Get(pageId);
         if (page is null)
@@ -79,8 +83,12 @@ public sealed class StoredPages : IPages
             return null;
         }
 
-        var key = Active(page.Id, utcOffset).Key;
-        return key.Length == 0 ? page.LayoutVersion : page.LayoutVersion + "-e" + key;
+        var audiences = AudiencesOf(user);
+        var layout = LayoutOf(page, audiences);
+        var key = ForAudiences(Active(page.Id, utcOffset), audiences).Key;
+        return page.LayoutVersion
+            + (layout.AudienceId is null ? string.Empty : "-g" + layout.AudienceId + "." + layout.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            + (key.Length == 0 ? string.Empty : "-e" + key);
     }
 
     /// <inheritdoc />
@@ -93,7 +101,8 @@ public sealed class StoredPages : IPages
         }
 
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
-        return EventOverlay.Apply(Expand(page, views), Active(page.Id, utcOffset).Events)
+        var audiences = AudiencesOf(user);
+        return EventOverlay.Apply(Expand(LayoutOf(page, audiences).Sections, views), ForAudiences(Active(page.Id, utcOffset), audiences).Events)
             .Select(slot => Build(slot, views))
             .OfType<PageSection>()
             .ToList();
@@ -105,10 +114,11 @@ public sealed class StoredPages : IPages
     /// </summary>
     /// <param name="pageId">The page id.</param>
     /// <param name="user">The user.</param>
-    /// <param name="active">The events to apply, highest first.</param>
+    /// <param name="active">The events to apply, highest first; those for other audiences are left out.</param>
+    /// <param name="audience">Preview as a member of this audience only, or null for the user's own audiences.</param>
     /// <param name="hidden">The sections the events hid.</param>
     /// <returns>The sections, or none if there is no such page.</returns>
-    public IReadOnlyList<PreviewSection> Preview(string pageId, User user, IReadOnlyList<ProgrammedEvent> active, out IReadOnlyList<PreviewHidden> hidden)
+    public IReadOnlyList<PreviewSection> Preview(string pageId, User user, IReadOnlyList<ProgrammedEvent> active, string? audience, out IReadOnlyList<PreviewHidden> hidden)
     {
         var page = _store.Get(pageId);
         if (page is null)
@@ -118,10 +128,11 @@ public sealed class StoredPages : IPages
         }
 
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
-        var expanded = Expand(page, views);
+        var audiences = audience is null || audience == EventAudiences.Everyone ? AudiencesOf(user) : [audience];
+        var expanded = Expand(LayoutOf(page, audiences).Sections, views);
         var titles = expanded.ToDictionary(s => s.Id, s => Build(new PageSlot(s, false), views)?.Title ?? s.Id, StringComparer.OrdinalIgnoreCase);
         var gone = new List<HiddenSection>();
-        var sections = EventOverlay.Apply(expanded, active, gone)
+        var sections = EventOverlay.Apply(expanded, active.Where(e => Applies(e, audiences)).ToList(), gone)
             .Select(slot => (Slot: slot, Section: Build(slot, views)))
             .Where(p => p.Section is not null)
             .Select(p => new PreviewSection(p.Section!.Id, p.Section.Title, p.Section.Source.Kind, p.Section.Display.Hint, p.Slot.Event, p.Slot.Change))
@@ -130,10 +141,30 @@ public sealed class StoredPages : IPages
         return sections;
     }
 
-    private static List<StoredSection> Expand(StoredPage page, Lazy<IReadOnlyList<LibraryView>> views)
+    private static bool Applies(ProgrammedEvent value, IReadOnlyList<string> audiences) =>
+        value.Audience == EventAudiences.Everyone || audiences.Contains(value.Audience, StringComparer.OrdinalIgnoreCase);
+
+    // The events on now for these audiences; when all of them apply, the set and its key are shared.
+    private static ActiveEvents ForAudiences(ActiveEvents active, IReadOnlyList<string> audiences)
+    {
+        if (active.Events.All(e => Applies(e, audiences)))
+        {
+            return active;
+        }
+
+        var events = active.Events.Where(e => Applies(e, audiences)).ToList();
+        return new ActiveEvents(events, EventTimeline.KeyOf(events), active.Until);
+    }
+
+    private IReadOnlyList<string> AudiencesOf(User? user) => user is null || _audiences is null ? [] : _audiences.AudiencesOf(user);
+
+    private ResolvedLayout LayoutOf(StoredPage page, IReadOnlyList<string> audiences) =>
+        _audiences is null ? new ResolvedLayout(null, 0, page.Sections) : _audiences.LayoutFor(page, audiences);
+
+    private static List<StoredSection> Expand(IReadOnlyList<StoredSection> sections, Lazy<IReadOnlyList<LibraryView>> views)
     {
         var expanded = new List<StoredSection>();
-        foreach (var stored in page.Sections)
+        foreach (var stored in sections)
         {
             if (stored.Type == SectionTypes.LatestLibraries)
             {

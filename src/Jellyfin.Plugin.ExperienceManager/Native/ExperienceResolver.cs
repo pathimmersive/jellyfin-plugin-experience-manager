@@ -49,7 +49,7 @@ public sealed class ExperienceResolver
     /// <returns>The resolved experience.</returns>
     public ResolvedExperience Resolve(User user, string familyId) => new(
         PageIds.Home,
-        _pages.LayoutVersion(PageIds.Home) ?? string.Empty,
+        _pages.LayoutVersion(PageIds.Home, null, user) ?? string.Empty,
         familyId,
         _pages.SectionsFor(PageIds.Home, user).Select(s => new ResolvedSection(s.Id, s.Title, s.Display, s.Source, s.SeeAll)).ToList());
 }

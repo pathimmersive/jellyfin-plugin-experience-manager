@@ -57,6 +57,16 @@ public class HomeClientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public ActionResult GetAdminScript() => Serve(_client.AdminScriptETag, _client.OpenAdminScript, HomeClient.ScriptContentType);
 
+    /// <summary>
+    /// Gets the admin page's Audiences script. The routes it calls are for administrators only.
+    /// </summary>
+    /// <returns>The script, or 304 when the client already has it.</returns>
+    [HttpGet(HomeClient.AudiencesScriptFileName)]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public ActionResult GetAudiencesScript() => Serve(_client.AudiencesScriptETag, _client.OpenAudiencesScript, HomeClient.ScriptContentType);
+
     private ActionResult Serve(string etag, Func<Stream> open, string contentType)
     {
         Response.Headers.CacheControl = "no-cache";

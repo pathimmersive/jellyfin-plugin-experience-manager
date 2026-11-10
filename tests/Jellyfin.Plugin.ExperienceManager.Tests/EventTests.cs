@@ -122,7 +122,7 @@ public sealed class EventTests : IDisposable
 
     private ProgrammedEvent Add(string name, EventSchedule schedule, params EventChange[] changes)
     {
-        var added = _events.Add(new ProgrammedEvent(string.Empty, name, true, Audiences.Everyone, schedule, changes), out var error);
+        var added = _events.Add(new ProgrammedEvent(string.Empty, name, true, EventAudiences.Everyone, schedule, changes), out var error);
         Assert.Null(error);
         return added!;
     }
@@ -279,7 +279,7 @@ public sealed class EventTests : IDisposable
     public void TheAdminListsCreatesEditsReordersPublishesAndUnpublishesEventsAndRefusesBadOnes()
     {
         var controller = new AdminEventsController(_events, _pages, _time);
-        var night = new ProgrammedEvent(string.Empty, "Movie night", false, Audiences.Everyone, new EventSchedule(ScheduleKinds.Weekly, Days: ["Friday"], From: "18:00", To: "23:00"), [new EventChange(ChangeKinds.Hide, "mymedia")]);
+        var night = new ProgrammedEvent(string.Empty, "Movie night", false, EventAudiences.Everyone, new EventSchedule(ScheduleKinds.Weekly, Days: ["Friday"], From: "18:00", To: "23:00"), [new EventChange(ChangeKinds.Hide, "mymedia")]);
 
         var added = controller.AddEvent(night).Value!;
         Assert.Equal(("movie-night", false), (added.Id, added.Published));

@@ -112,7 +112,7 @@ public class ReachRegistryTests
     public void The_resolver_gives_the_sections_in_order_with_display_and_source_without_loading_items()
     {
         var page = Substitute.For<IPages>();
-        page.LayoutVersion("home").Returns("r1");
+        page.LayoutVersion("home", Arg.Any<int?>(), Arg.Any<User?>()).Returns("r1");
         page.SectionsFor("home", Viewer).Returns(
         [
             new PageSection("featured", "Featured", new SectionDisplay("feature", "landscape"), new SectionSource(SectionSources.Featured), null, 5, _ => throw new InvalidOperationException("items loaded")),
