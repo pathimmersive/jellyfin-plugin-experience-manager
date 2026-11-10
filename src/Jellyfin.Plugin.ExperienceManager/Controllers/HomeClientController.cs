@@ -47,6 +47,16 @@ public class HomeClientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public ActionResult GetStyle() => Serve(_client.StyleETag, _client.OpenStyle, HomeClient.StyleContentType);
 
+    /// <summary>
+    /// Gets the admin page's Programming script. The routes it calls are for administrators only.
+    /// </summary>
+    /// <returns>The script, or 304 when the client already has it.</returns>
+    [HttpGet(HomeClient.AdminScriptFileName)]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public ActionResult GetAdminScript() => Serve(_client.AdminScriptETag, _client.OpenAdminScript, HomeClient.ScriptContentType);
+
     private ActionResult Serve(string etag, Func<Stream> open, string contentType)
     {
         Response.Headers.CacheControl = "no-cache";

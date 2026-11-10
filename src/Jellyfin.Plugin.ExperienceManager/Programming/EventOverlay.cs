@@ -10,7 +10,16 @@ namespace Jellyfin.Plugin.ExperienceManager.Programming;
 /// </summary>
 /// <param name="Section">What it shows.</param>
 /// <param name="Feature">Whether it is shown as the featured banner.</param>
-public sealed record PageSlot(StoredSection Section, bool Feature);
+/// <param name="Event">The event that put it there or changed it, if any.</param>
+/// <param name="Change">The change that event made: one of <see cref="ChangeKinds"/>.</param>
+public sealed record PageSlot(StoredSection Section, bool Feature, string? Event = null, string? Change = null);
+
+/// <summary>
+/// A section an event hid.
+/// </summary>
+/// <param name="Id">The section's id.</param>
+/// <param name="Event">The event that hid it.</param>
+public sealed record HiddenSection(string Id, string Event);
 
 /// <summary>
 /// Applies the active events to a page's sections, never to the stored layout.
@@ -22,23 +31,25 @@ public static class EventOverlay
     /// </summary>
     /// <param name="sections">The page's sections, with Latest for each library already one section per library.</param>
     /// <param name="active">The events on now, highest first.</param>
+    /// <param name="hidden">Collects the sections the events hid, when given.</param>
     /// <returns>The page's places.</returns>
-    public static List<PageSlot> Apply(IReadOnlyList<StoredSection> sections, IReadOnlyList<ProgrammedEvent> active)
+    public static List<PageSlot> Apply(IReadOnlyList<StoredSection> sections, IReadOnlyList<ProgrammedEvent> active, ICollection<HiddenSection>? hidden = null)
     {
         var slots = sections.Select(s => new PageSlot(s, s.Type == SectionTypes.Featured)).ToList();
         var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var insertedAfter = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         int Find(string? id) => id is null ? -1 : slots.FindIndex(s => string.Equals(s.Section.Id, id, StringComparison.OrdinalIgnoreCase));
 
-        foreach (var change in active.SelectMany(e => e.Changes))
+        foreach (var (name, change) in active.SelectMany(e => e.Changes.Select(c => (e.Name, c))))
         {
             switch (change.Kind)
             {
                 case ChangeKinds.Hide:
-                    var hidden = Find(change.Target);
-                    if (hidden >= 0 && claimed.Add(slots[hidden].Section.Id))
+                    var gone = Find(change.Target);
+                    if (gone >= 0 && claimed.Add(slots[gone].Section.Id))
                     {
-                        slots.RemoveAt(hidden);
+                        hidden?.Add(new HiddenSection(slots[gone].Section.Id, name));
+                        slots.RemoveAt(gone);
                     }
 
                     break;
@@ -47,7 +58,7 @@ public static class EventOverlay
                     if (at >= 0 && claimed.Add(slots[at].Section.Id))
                     {
                         var place = slots[at];
-                        slots[at] = new PageSlot(change.Section! with { Id = place.Section.Id }, place.Feature || change.Kind == ChangeKinds.Featured);
+                        slots[at] = new PageSlot(change.Section! with { Id = place.Section.Id }, place.Feature || change.Kind == ChangeKinds.Featured, name, change.Kind);
                     }
 
                     break;
@@ -68,7 +79,7 @@ public static class EventOverlay
 
                     var before = insertedAfter.GetValueOrDefault(key);
                     insertedAfter[key] = before + 1;
-                    slots.Insert(Math.Min(anchor + 1 + before, slots.Count), new PageSlot(section, false));
+                    slots.Insert(Math.Min(anchor + 1 + before, slots.Count), new PageSlot(section, false, name, ChangeKinds.Insert));
                     break;
             }
         }
@@ -87,6 +98,7 @@ public static class EventOverlay
     {
         var featured = sections.FirstOrDefault(s => s.Type == SectionTypes.Featured)?.Id ?? SectionTypes.Featured;
         var published = events.Where(e => e.Published).ToList();
+        var names = Names(sections, published);
         var lines = new List<string>();
         for (var i = 0; i < published.Count; i++)
         {
@@ -96,12 +108,39 @@ public static class EventOverlay
                 var shared = Touched(higher, featured).Intersect(Touched(lower, featured), StringComparer.OrdinalIgnoreCase).ToList();
                 if (shared.Count > 0 && Overlap(higher.Schedule, lower.Schedule, now))
                 {
-                    lines.Add($"{higher.Name} and {lower.Name} both change {string.Join(", ", shared)}; {higher.Name} wins, as it is higher in the list.");
+                    lines.Add($"{higher.Name} and {lower.Name} both change {string.Join(", ", shared.Select(id => names.GetValueOrDefault(id) ?? id))}; {higher.Name} wins, as it is higher in the list.");
                 }
             }
         }
 
         return lines;
+    }
+
+    // A section's name as the admin knows it: its own title, its type's, or the title an event gives it.
+    private static Dictionary<string, string> Names(IReadOnlyList<StoredSection> sections, IReadOnlyList<ProgrammedEvent> events)
+    {
+        var builtIn = new Dictionary<string, string>
+        {
+            [SectionTypes.Featured] = "Featured",
+            [SectionTypes.MyMedia] = "My Media",
+            [SectionTypes.ContinueWatching] = "Continue Watching",
+            [SectionTypes.NextUp] = "Next Up",
+        };
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var change in events.SelectMany(e => e.Changes).Where(c => c.Kind == ChangeKinds.Insert && c.Section?.Title is not null))
+        {
+            names.TryAdd(change.Section!.Id, change.Section.Title!);
+        }
+
+        foreach (var section in sections)
+        {
+            if ((section.Title ?? builtIn.GetValueOrDefault(section.Type)) is { } name)
+            {
+                names[section.Id] = name;
+            }
+        }
+
+        return names;
     }
 
     private static IEnumerable<string> Touched(ProgrammedEvent value, string featured) =>

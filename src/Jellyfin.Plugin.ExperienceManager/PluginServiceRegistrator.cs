@@ -33,7 +33,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<PageStore>();
         serviceCollection.AddSingleton<EventStore>();
         serviceCollection.AddSingleton<EventTimeline>();
-        serviceCollection.AddSingleton<IPages, StoredPages>();
+        serviceCollection.AddSingleton<StoredPages>();
+        serviceCollection.AddSingleton<IPages>(services => services.GetRequiredService<StoredPages>());
         serviceCollection.AddSingleton<HomePageService>();
         serviceCollection.AddSingleton<IScheduledTask, WarmHomeCacheTask>();
 

@@ -19,6 +19,57 @@
             #experienceManagerPage td.em-num { text-align: right; padding-right: 1.5em; }
             #experienceManagerPage .em-apps { font-size: .85em; opacity: .7; }
             #experienceManagerPage .em-muted { opacity: .7; }
+            #experienceManagerPage .em-prog { max-width: 100%; }
+            #experienceManagerPage .em-prog-toolbar { display: flex; flex-wrap: wrap; gap: .5em; align-items: center; margin: 1em 0; }
+            #experienceManagerPage .em-prog-button { margin: 0; }
+            #experienceManagerPage .em-prog-view[aria-pressed="true"] { font-weight: 600; outline: 2px solid currentColor; }
+            #experienceManagerPage .em-prog-label { min-width: 8em; text-align: center; font-weight: 600; }
+            #experienceManagerPage .em-prog-message, #experienceManagerPage .em-prog-error { color: #ff8a65; }
+            #experienceManagerPage .em-prog-templates { margin: 0 0 1.5em; display: flex; flex-wrap: wrap; gap: .5em; align-items: center; }
+            #experienceManagerPage .em-prog-templates h3 { width: 100%; margin: 0; font-size: 1em; }
+            #experienceManagerPage .em-prog-year { position: relative; margin: 0 0 2em; }
+            #experienceManagerPage .em-prog-lane { display: flex; align-items: stretch; min-height: 2.2em; border-bottom: 1px solid rgba(128, 128, 128, .25); }
+            #experienceManagerPage .em-prog-lane-title { flex: 0 0 10em; padding: .45em .5em .45em 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #experienceManagerPage .em-prog-track { position: relative; flex: 1 1 auto; min-width: 0; }
+            #experienceManagerPage .em-prog-months { min-height: 1.6em; font-size: .85em; opacity: .7; }
+            #experienceManagerPage .em-prog-month { position: absolute; top: .2em; border-left: 1px solid rgba(128, 128, 128, .35); padding-left: .25em; }
+            #experienceManagerPage .em-prog-bar { position: absolute; top: .35em; height: 1.5em; line-height: 1.5em; padding: 0 .35em; box-sizing: border-box; border-radius: .25em; font-size: .8em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+            #experienceManagerPage .em-published { background: rgba(0, 164, 220, .55); }
+            #experienceManagerPage .em-draft { border: 1px dashed currentColor; background: rgba(128, 128, 128, .15); }
+            #experienceManagerPage .em-prog-bar.em-weekly { background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, .25) 0 2px, transparent 2px 10px); }
+            #experienceManagerPage .em-prog-empty { position: absolute; top: .5em; font-size: .8em; }
+            #experienceManagerPage .em-prog-today-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: #ff8a65; pointer-events: none; }
+            #experienceManagerPage table.em-prog-monthgrid { table-layout: fixed; }
+            #experienceManagerPage .em-prog-monthgrid td { height: 5em; overflow: hidden; }
+            #experienceManagerPage .em-prog-monthgrid.em-compact td { height: 2.6em; padding: .2em; }
+            #experienceManagerPage .em-prog-is-today .em-prog-daynum { color: #ff8a65; font-weight: 600; }
+            #experienceManagerPage .em-prog-chip { display: block; font-size: .75em; padding: 0 .3em; margin: .1em 0; border-radius: .2em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+            #experienceManagerPage .em-compact .em-prog-chip { display: inline-block; width: .55em; height: .55em; padding: 0; margin: 0 .1em; border-radius: 50%; }
+            #experienceManagerPage .em-prog-list { list-style: none; padding: 0; margin: .5em 0 1em; }
+            #experienceManagerPage .em-prog-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6em; padding: .5em; margin: 0 0 .4em; border-radius: .3em; }
+            #experienceManagerPage .em-prog-handle { cursor: grab; opacity: .6; }
+            #experienceManagerPage .em-prog-row-text { flex: 1 1 12em; min-width: 0; }
+            #experienceManagerPage .em-prog-row-name { font-weight: 600; }
+            #experienceManagerPage .em-prog-row-when { font-size: .85em; }
+            #experienceManagerPage .em-prog-switch { display: inline-flex; gap: .3em; align-items: center; }
+            #experienceManagerPage .em-prog-conflict { font-style: italic; }
+            #experienceManagerPage .em-prog-editor { margin: 2em 0; padding: 1em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; max-width: 46em; box-sizing: border-box; }
+            #experienceManagerPage .em-prog-editor fieldset { border: 1px solid rgba(128, 128, 128, .25); margin: 1em 0; padding: .6em; min-width: 0; }
+            #experienceManagerPage .em-prog-field { display: flex; flex-wrap: wrap; gap: .5em; align-items: center; margin: .4em 0; }
+            #experienceManagerPage .em-prog-field > span { flex: 0 0 8em; }
+            #experienceManagerPage .em-prog-field input, #experienceManagerPage .em-prog-field select { max-width: 100%; min-width: 0; box-sizing: border-box; }
+            #experienceManagerPage .em-prog-field select[multiple] { min-height: 6em; min-width: 12em; }
+            #experienceManagerPage .em-prog-monthday { display: inline-flex; gap: .4em; align-items: center; margin: .4em 1em .4em 0; }
+            #experienceManagerPage .em-prog-monthday input { width: 4em; }
+            #experienceManagerPage .em-prog-days { display: flex; flex-wrap: wrap; gap: .6em; }
+            #experienceManagerPage .em-prog-change { border-top: 1px solid rgba(128, 128, 128, .25); padding: .5em 0; }
+            #experienceManagerPage .em-prog-actions { display: flex; flex-wrap: wrap; gap: .5em; }
+            #experienceManagerPage .em-prog-mark, #experienceManagerPage .em-prog-hidden { opacity: .8; font-style: italic; }
+            @media (max-width: 600px) {
+                #experienceManagerPage .em-nav { gap: .8em; }
+                #experienceManagerPage .em-prog-field > span { flex-basis: 100%; }
+                #experienceManagerPage .em-prog-editor { padding: .6em; }
+            }
         </style>
         <div data-role="content">
             <div class="content-primary">
@@ -32,7 +83,7 @@
                 var page = document.querySelector('#experienceManagerPage');
                 // The admin pages, grouped as the plugin's design has them. Only the built ones open.
                 var groups = [
-                    { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout' }, { id: 'programming', title: 'Programming' }] },
+                    { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout' }, { id: 'programming', title: 'Programming', built: true }] },
                     { title: 'People', pages: [{ id: 'audiences', title: 'Audiences' }, { id: 'defaults', title: 'Group defaults' }] },
                     { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules' }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
@@ -96,6 +147,10 @@
                         panel.appendChild(el('p', 'Coming later.', 'em-muted'));
                         return;
                     }
+                    if (current === 'programming') {
+                        drawProgramming(panel);
+                        return;
+                    }
                     panel.appendChild(el('p', 'Which apps your users watch on, and what Experience Manager reaches on each. Every device registered with this server is counted.'));
                     var status = panel.appendChild(el('p', 'Loading…', 'em-muted em-status'));
                     ApiClient.getJSON(ApiClient.getUrl('ExperienceManager/Admin/Clients')).then(function (census) {
@@ -105,6 +160,23 @@
                     }, function () {
                         status.textContent = 'The census could not be loaded. Reload the page to try again.';
                     });
+                }
+
+                // The Programming page is its own script, loaded the first time it opens.
+                function drawProgramming(panel) {
+                    if (window.ExperienceManagerProgramming) {
+                        window.ExperienceManagerProgramming.draw(panel);
+                        return;
+                    }
+                    var status = panel.appendChild(el('p', 'Loading…', 'em-muted'));
+                    var script = document.createElement('script');
+                    script.src = ApiClient.getUrl('ExperienceManager/admin-programming.js');
+                    script.onload = function () {
+                        status.remove();
+                        if (current === 'programming') window.ExperienceManagerProgramming.draw(panel);
+                    };
+                    script.onerror = function () { status.textContent = 'The Programming page could not be loaded. Reload the page to try again.'; };
+                    document.head.appendChild(script);
                 }
 
                 function drawCensus(panel, census) {

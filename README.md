@@ -6,7 +6,7 @@ Experience Manager is a Jellyfin server plugin that gives server admins control 
 
 ## Status
 
-Early development; there is no release yet. The plugin draws a first version of its home screen in jellyfin-web. Home is stored in the plugin's own database, starting as a featured banner, My Media, Continue Watching, Next Up and Latest. Scheduled events, such as a Christmas row, overlay it for a while. The admin page cannot edit either yet; admin-only routes can.
+Early development; there is no release yet. The plugin draws a first version of its home screen in jellyfin-web. Home is stored in the plugin's own database, starting as a featured banner, My Media, Continue Watching, Next Up and Latest. Scheduled events, such as a Christmas row, overlay it for a while; the admin page's Programming page plans, orders, publishes and previews them. The layout itself can be changed only through an admin-only route so far.
 
 ## Home API
 
@@ -31,6 +31,7 @@ You need the .NET 10 SDK, Node.js 22 or later, and bash.
 ```bash
 dotnet test                            # builds the plugin and runs its tests
 node --test "tests/home/*.test.js"     # home client tests
+node --test "tests/admin/*.test.js"    # admin page tests
 node --test "tests/api/*.test.mjs"     # API contract tests
 bash scripts/check-community-files.sh  # community files
 bash scripts/coverage.sh               # both test suites, with a coverage summary

@@ -12,6 +12,25 @@ using MediaBrowser.Controller.Entities;
 namespace Jellyfin.Plugin.ExperienceManager.Home;
 
 /// <summary>
+/// One section of a previewed page, and the event that changed it.
+/// </summary>
+/// <param name="Id">The section's id.</param>
+/// <param name="Title">Its title.</param>
+/// <param name="Source">What it shows: one of <see cref="SectionSources"/>.</param>
+/// <param name="Display">How it is shown: <c>row</c> or <c>feature</c>.</param>
+/// <param name="Event">The event that added or changed it, or null.</param>
+/// <param name="Change">What that event did: one of the change kinds, or null.</param>
+public sealed record PreviewSection(string Id, string Title, string Source, string Display, string? Event, string? Change);
+
+/// <summary>
+/// A section an event hid in a previewed page.
+/// </summary>
+/// <param name="Id">The section's id.</param>
+/// <param name="Title">Its title.</param>
+/// <param name="Event">The event that hid it.</param>
+public sealed record PreviewHidden(string Id, string Title, string Event);
+
+/// <summary>
 /// The pages stored in the plugin's database, each resolved for the user: Latest for each library becomes one
 /// section per movie and show library the user can see, in the user's library order, then Home's events on now
 /// are laid over it.
@@ -74,6 +93,45 @@ public sealed class StoredPages : IPages
         }
 
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
+        return EventOverlay.Apply(Expand(page, views), Active(page.Id, utcOffset).Events)
+            .Select(slot => Build(slot, views))
+            .OfType<PageSection>()
+            .ToList();
+    }
+
+    /// <summary>
+    /// Resolves a page for a user with the given events on, instead of those on now, and says which event changed
+    /// each section. Nothing is stored.
+    /// </summary>
+    /// <param name="pageId">The page id.</param>
+    /// <param name="user">The user.</param>
+    /// <param name="active">The events to apply, highest first.</param>
+    /// <param name="hidden">The sections the events hid.</param>
+    /// <returns>The sections, or none if there is no such page.</returns>
+    public IReadOnlyList<PreviewSection> Preview(string pageId, User user, IReadOnlyList<ProgrammedEvent> active, out IReadOnlyList<PreviewHidden> hidden)
+    {
+        var page = _store.Get(pageId);
+        if (page is null)
+        {
+            hidden = [];
+            return [];
+        }
+
+        var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
+        var expanded = Expand(page, views);
+        var titles = expanded.ToDictionary(s => s.Id, s => Build(new PageSlot(s, false), views)?.Title ?? s.Id, StringComparer.OrdinalIgnoreCase);
+        var gone = new List<HiddenSection>();
+        var sections = EventOverlay.Apply(expanded, active, gone)
+            .Select(slot => (Slot: slot, Section: Build(slot, views)))
+            .Where(p => p.Section is not null)
+            .Select(p => new PreviewSection(p.Section!.Id, p.Section.Title, p.Section.Source.Kind, p.Section.Display.Hint, p.Slot.Event, p.Slot.Change))
+            .ToList();
+        hidden = gone.Select(h => new PreviewHidden(h.Id, titles.GetValueOrDefault(h.Id) ?? h.Id, h.Event)).ToList();
+        return sections;
+    }
+
+    private static List<StoredSection> Expand(StoredPage page, Lazy<IReadOnlyList<LibraryView>> views)
+    {
         var expanded = new List<StoredSection>();
         foreach (var stored in page.Sections)
         {
@@ -89,10 +147,7 @@ public sealed class StoredPages : IPages
             }
         }
 
-        return EventOverlay.Apply(expanded, Active(page.Id, utcOffset).Events)
-            .Select(slot => Build(slot, views))
-            .OfType<PageSection>()
-            .ToList();
+        return expanded;
     }
 
     private ActiveEvents Active(string pageId, int? utcOffset) =>
