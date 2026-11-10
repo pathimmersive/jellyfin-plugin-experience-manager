@@ -48,6 +48,13 @@ public class HomeClient
 
     private static readonly Lazy<string> _audiencesScriptETag = new(() => ComputeETag(AudiencesScriptFileName));
 
+    /// <summary>
+    /// The admin page's Home layout script, served beside the home client.
+    /// </summary>
+    public const string LayoutScriptFileName = "admin-layout.js";
+
+    private static readonly Lazy<string> _layoutScriptETag = new(() => ComputeETag(LayoutScriptFileName));
+
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
     private static readonly Lazy<string> _styleETag = new(() => ComputeETag(StyleFileName));
@@ -94,6 +101,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script.</returns>
     public Stream OpenAudiencesScript() => OpenResource(AudiencesScriptFileName);
+
+    /// <summary>
+    /// Gets the admin Home layout script's entity tag, from its content.
+    /// </summary>
+    public string LayoutScriptETag => _layoutScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin Home layout script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenLayoutScript() => OpenResource(LayoutScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

@@ -50,6 +50,7 @@ public sealed class LayoutDatabase
             """),
         Programming.EventStore.Migration,
         Audiences.AudienceStore.Migration,
+        SectionMigrations.Off,
     ];
 
     private readonly string _connectionString;

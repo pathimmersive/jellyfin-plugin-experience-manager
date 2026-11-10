@@ -31,6 +31,7 @@
     <!-- The admin page's Programming script, which admin.html loads from /ExperienceManager/admin-programming.js. -->
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\programming.js" LogicalName="admin-programming.js" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\audiences.js" LogicalName="admin-audiences.js" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\layout.js" LogicalName="admin-layout.js" />
   </ItemGroup>
 
   <!-- The plugin image: Dashboard → Plugins shows it from the plugin folder (meta.json's imagePath), and the

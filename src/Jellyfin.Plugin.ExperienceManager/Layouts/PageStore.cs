@@ -14,7 +14,17 @@ namespace Jellyfin.Plugin.ExperienceManager.Layouts;
 /// <param name="Type">One of <see cref="SectionTypes.All"/>.</param>
 /// <param name="Title">Its title, or null for the type's own.</param>
 /// <param name="Config">The type's settings, or null for none.</param>
-public sealed record StoredSection(string Id, string Type, string? Title = null, JsonObject? Config = null);
+/// <param name="Off">Whether it is switched off: kept in the layout, not served.</param>
+public sealed record StoredSection(string Id, string Type, string? Title = null, JsonObject? Config = null, bool Off = false);
+
+/// <summary>
+/// The migration that lets a section be switched off without removing it.
+/// </summary>
+public static class SectionMigrations
+{
+    /// <summary>The off flag on the server layout's sections; group layouts keep it in their entries.</summary>
+    public static readonly Migration Off = new(4, "ALTER TABLE sections ADD COLUMN off INTEGER NOT NULL DEFAULT 0;");
+}
 
 /// <summary>
 /// A stored page: its server layout's sections in order, and a revision that changes with every edit.
@@ -159,7 +169,7 @@ public sealed class PageStore
 
     private static bool Same(IReadOnlyList<StoredSection> a, IReadOnlyList<StoredSection> b) =>
         a.Count == b.Count && a.Zip(b).All(p =>
-            p.First.Id == p.Second.Id && p.First.Type == p.Second.Type && p.First.Title == p.Second.Title
+            p.First.Id == p.Second.Id && p.First.Type == p.Second.Type && p.First.Title == p.Second.Title && p.First.Off == p.Second.Off
             && ConfigText(p.First.Config) == ConfigText(p.Second.Config));
 
     private static string ConfigText(JsonObject? config) => config?.ToJsonString() ?? "{}";
@@ -190,13 +200,14 @@ public sealed class PageStore
             Run(
                 connection,
                 transaction,
-                $"INSERT INTO sections (layout_id, position, id, type, title, config) VALUES ({Layout}, $position, $id, $type, $title, $config);",
+                $"INSERT INTO sections (layout_id, position, id, type, title, config, off) VALUES ({Layout}, $position, $id, $type, $title, $config, $off);",
                 ("$page", pageId),
                 ("$position", i),
                 ("$id", s.Id),
                 ("$type", s.Type),
                 ("$title", (object?)s.Title ?? DBNull.Value),
-                ("$config", ConfigText(s.Config)));
+                ("$config", ConfigText(s.Config)),
+                ("$off", s.Off ? 1 : 0));
         }
     }
 
@@ -218,7 +229,7 @@ public sealed class PageStore
         using var connection = _database.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT p.id, p.revision, s.id, s.type, s.title, s.config
+            SELECT p.id, p.revision, s.id, s.type, s.title, s.config, s.off
             FROM pages p
             JOIN layouts l ON l.page_id = p.id AND l.scope = 'server' AND l.scope_id = ''
             LEFT JOIN sections s ON s.layout_id = l.id
@@ -242,7 +253,8 @@ public sealed class PageStore
                     reader.GetString(2),
                     reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetString(4),
-                    config is { Count: > 0 } ? config : null));
+                    config is { Count: > 0 } ? config : null,
+                    !reader.IsDBNull(6) && reader.GetInt32(6) != 0));
             }
         }
 

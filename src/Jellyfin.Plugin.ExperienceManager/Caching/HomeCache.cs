@@ -134,6 +134,13 @@ public sealed class HomeCache : IDisposable
     public string? ItemName(Guid id) => _library.GetItemById(id)?.Name;
 
     /// <summary>
+    /// Gets a value indicating whether an item, such as a library or collection, still exists.
+    /// </summary>
+    /// <param name="id">The item.</param>
+    /// <returns>Whether it exists.</returns>
+    public bool Exists(Guid id) => _library.GetItemById(id) is not null;
+
+    /// <summary>
     /// Leaves out the items a user has watched: those marked played for them.
     /// </summary>
     /// <param name="user">The user.</param>

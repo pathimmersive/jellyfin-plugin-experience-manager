@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url'
 export const PREFIX = '/ExperienceManager/'
 
 // The web client's own files: served by the plugin, but not API.
-export const CLIENT_FILES = ['/ExperienceManager/home.js', '/ExperienceManager/home.css', '/ExperienceManager/admin-programming.js', '/ExperienceManager/admin-audiences.js']
+export const CLIENT_FILES = ['/ExperienceManager/home.js', '/ExperienceManager/home.css', '/ExperienceManager/admin-programming.js', '/ExperienceManager/admin-audiences.js', '/ExperienceManager/admin-layout.js']
 
 // The admin page's own routes: administrators only, free to change, and not for client authors.
 export const ADMIN_PREFIX = '/ExperienceManager/Admin/'
