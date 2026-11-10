@@ -39,7 +39,14 @@ public class HomeClient
     /// </summary>
     public const string AdminScriptFileName = "admin-programming.js";
 
+    /// <summary>
+    /// The admin page's Audiences script, served beside the home client.
+    /// </summary>
+    public const string AudiencesScriptFileName = "admin-audiences.js";
+
     private static readonly Lazy<string> _adminScriptETag = new(() => ComputeETag(AdminScriptFileName));
+
+    private static readonly Lazy<string> _audiencesScriptETag = new(() => ComputeETag(AudiencesScriptFileName));
 
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
@@ -76,6 +83,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script.</returns>
     public Stream OpenAdminScript() => OpenResource(AdminScriptFileName);
+
+    /// <summary>
+    /// Gets the admin Audiences script's entity tag, from its content.
+    /// </summary>
+    public string AudiencesScriptETag => _audiencesScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin Audiences script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenAudiencesScript() => OpenResource(AudiencesScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

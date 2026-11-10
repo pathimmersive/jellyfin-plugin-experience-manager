@@ -31,8 +31,8 @@ public class HomeApiControllerTests
     public HomeApiControllerTests()
     {
         _users.GetUserById(Viewer.Id).Returns(Viewer);
-        _page.LayoutVersion(Arg.Any<string>()).Returns((string?)null);
-        _page.LayoutVersion("home").Returns("test-1");
+        _page.LayoutVersion(Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<User?>()).Returns((string?)null);
+        _page.LayoutVersion("home", Arg.Any<int?>(), Arg.Any<User?>()).Returns("test-1");
         _page.SectionsFor("home", Viewer).Returns(
         [
             new PageSection("latest", "Latest", new SectionDisplay("row", "portrait"), new SectionSource(SectionSources.Latest, null, "Movie"), null, 16, _ => ([Latest], true)),

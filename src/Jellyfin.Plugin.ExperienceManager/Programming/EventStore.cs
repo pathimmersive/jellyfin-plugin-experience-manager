@@ -42,9 +42,9 @@ public static class ChangeKinds
 /// <summary>
 /// The audiences an event can have.
 /// </summary>
-public static class Audiences
+public static class EventAudiences
 {
-    /// <summary>Every user. The only audience until groups exist.</summary>
+    /// <summary>Every user.</summary>
     public const string Everyone = "everyone";
 }
 
@@ -97,6 +97,7 @@ public sealed class EventStore
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     private readonly LayoutDatabase _database;
+    private readonly Func<string, bool> _audienceExists;
     private readonly object _write = new();
     private volatile IReadOnlyList<ProgrammedEvent> _events;
 
@@ -104,9 +105,16 @@ public sealed class EventStore
     /// Initializes a new instance of the <see cref="EventStore"/> class.
     /// </summary>
     /// <param name="database">The plugin's database.</param>
-    public EventStore(LayoutDatabase database)
+    /// <param name="audiences">The audiences an event can be for.</param>
+    public EventStore(LayoutDatabase database, ExperienceManager.Audiences.AudienceStore audiences)
+        : this(database, id => audiences.Get(id) is not null)
+    {
+    }
+
+    internal EventStore(LayoutDatabase database, Func<string, bool>? audienceExists = null)
     {
         _database = database;
+        _audienceExists = audienceExists ?? (_ => false);
         _events = Load();
     }
 
@@ -139,7 +147,7 @@ public sealed class EventStore
         {
             var id = string.IsNullOrWhiteSpace(value.Id) ? NewId(value.Name) : value.Id.Trim();
             value = value with { Id = id };
-            error = Validate(value) ?? (Get(id) is null ? null : $"an event with id {id} exists");
+            error = Check(value) ?? (Get(id) is null ? null : $"an event with id {id} exists");
             if (error is not null)
             {
                 return null;
@@ -168,7 +176,7 @@ public sealed class EventStore
             }
 
             value = value with { Id = current.Id };
-            error = Validate(value);
+            error = Check(value);
             if (error is not null)
             {
                 return null;
@@ -249,6 +257,16 @@ public sealed class EventStore
         }
     }
 
+    /// <summary>
+    /// Checks an event, its audience included, returning why it cannot be stored.
+    /// </summary>
+    /// <param name="value">The event.</param>
+    /// <returns>The reason, or null if it is valid.</returns>
+    public string? Check(ProgrammedEvent value) =>
+        value.Audience is { } audience && audience != EventAudiences.Everyone && !_audienceExists(audience)
+            ? $"there is no audience '{audience}'"
+            : Validate(value with { Audience = EventAudiences.Everyone });
+
     internal static string? Validate(ProgrammedEvent value)
     {
         if (string.IsNullOrWhiteSpace(value.Name))
@@ -256,9 +274,9 @@ public sealed class EventStore
             return "an event needs a name";
         }
 
-        if (value.Audience != Audiences.Everyone)
+        if (value.Audience != EventAudiences.Everyone)
         {
-            return $"the audience is {Audiences.Everyone} until groups exist";
+            return $"there is no audience '{value.Audience}'";
         }
 
         if (Schedules.Validate(value.Schedule) is { } schedule)

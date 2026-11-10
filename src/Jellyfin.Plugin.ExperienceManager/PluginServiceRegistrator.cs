@@ -1,4 +1,6 @@
 using System;
+using Jellyfin.Data.Events.Users;
+using Jellyfin.Plugin.ExperienceManager.Audiences;
 using Jellyfin.Plugin.ExperienceManager.Caching;
 using Jellyfin.Plugin.ExperienceManager.Home;
 using Jellyfin.Plugin.ExperienceManager.Integration;
@@ -9,6 +11,7 @@ using Jellyfin.Plugin.ExperienceManager.Programming;
 using Jellyfin.Plugin.ExperienceManager.Tasks;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
+using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Hosting;
@@ -31,6 +34,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IHomeSources, JellyfinHomeSources>();
         serviceCollection.AddSingleton(services => new LayoutDatabase(LayoutDatabase.DefaultPath(services.GetRequiredService<IApplicationPaths>())));
         serviceCollection.AddSingleton<PageStore>();
+        serviceCollection.AddSingleton<AudienceStore>();
+        serviceCollection.AddSingleton<AudienceResolver>();
+        serviceCollection.AddSingleton<IEventConsumer<UserCreatedEventArgs>, UserCreatedRecorder>();
+        serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, UserDeletedRecorder>();
         serviceCollection.AddSingleton<EventStore>();
         serviceCollection.AddSingleton<EventTimeline>();
         serviceCollection.AddSingleton<StoredPages>();

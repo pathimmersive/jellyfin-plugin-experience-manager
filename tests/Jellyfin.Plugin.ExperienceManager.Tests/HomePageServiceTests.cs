@@ -35,7 +35,7 @@ public class HomePageServiceTests
     private HomePageService Service(params PageSection[] sections)
     {
         var page = Substitute.For<IPages>();
-        page.LayoutVersion("home").Returns("test-1");
+        page.LayoutVersion("home", Arg.Any<int?>(), Arg.Any<User?>()).Returns("test-1");
         page.SectionsFor("home", Arg.Any<User>()).Returns(sections);
         return new HomePageService(page, _dto, NullLogger<HomePageService>.Instance);
     }

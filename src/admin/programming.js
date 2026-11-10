@@ -247,7 +247,7 @@
     // ---- The page ----
 
     var BASE = 'ExperienceManager/Admin/';
-    var state = { view: 'year', date: new Date(), events: [], conflicts: [], stored: [], libraries: [], genres: [], tags: [], collections: [], editing: null, message: '' };
+    var state = { view: 'year', date: new Date(), events: [], conflicts: [], stored: [], libraries: [], genres: [], tags: [], collections: [], audiences: [], editing: null, message: '' };
     var root = null;
 
     function el(tag, text, className) {
@@ -288,6 +288,12 @@
         return map;
     }
 
+    function audienceText(e) {
+        if (!e.Audience || e.Audience === 'everyone') return '';
+        var found = state.audiences.filter(function (a) { return a.Id === e.Audience; })[0];
+        return ' · for ' + (found ? found.Name : e.Audience);
+    }
+
     function isPhone() {
         return window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
     }
@@ -299,7 +305,8 @@
             call('GET', BASE + 'Pages/home'),
             call('GET', 'Library/VirtualFolders'),
             call('GET', 'Items/Filters2?Recursive=true&UserId=' + userId),
-            call('GET', 'Items?Recursive=true&IncludeItemTypes=BoxSet&SortBy=SortName&UserId=' + userId)
+            call('GET', 'Items?Recursive=true&IncludeItemTypes=BoxSet&SortBy=SortName&UserId=' + userId),
+            call('GET', BASE + 'Audiences')
         ]).then(function (r) {
             if (!r[0].ok || !r[1].ok) throw new Error('events');
             state.events = r[0].body.Events;
@@ -309,6 +316,7 @@
             state.genres = r[3].ok ? (r[3].body.Genres || []).map(function (g) { return g.Name; }) : [];
             state.tags = r[3].ok ? (r[3].body.Tags || []) : [];
             state.collections = r[4].ok ? r[4].body.Items : [];
+            state.audiences = r[5].ok ? r[5].body.Audiences : [];
         });
     }
 
@@ -470,7 +478,7 @@
             row.appendChild(el('span', '⠿', 'em-prog-handle')).setAttribute('aria-hidden', 'true');
             var text = row.appendChild(el('div', null, 'em-prog-row-text'));
             text.appendChild(el('div', e.Name + (e.Published ? '' : ' · draft'), 'em-prog-row-name'));
-            text.appendChild(el('div', describeSchedule(e.Schedule), 'em-muted em-prog-row-when'));
+            text.appendChild(el('div', describeSchedule(e.Schedule) + audienceText(e), 'em-muted em-prog-row-when'));
             var label = row.appendChild(el('label', null, 'em-prog-switch'));
             var box = label.appendChild(el('input'));
             box.type = 'checkbox';
@@ -671,9 +679,9 @@
         form.appendChild(el('h3', state.editingNew ? 'New event' : 'Edit ' + ev.Name));
         field(form, 'Name', input('text', 'name', ev.Name)).addEventListener('input', function (x) { ev.Name = x.target.value; });
         drawSchedule(form, ev);
-        var audience = field(form, 'Audience', input('text', 'audience', 'Everyone'));
-        audience.disabled = true;
-        form.appendChild(el('p', 'Groups come later; every event is for everyone until then.', 'em-muted'));
+        var audiences = [{ value: 'everyone', text: 'Everyone' }].concat(state.audiences.map(function (a) { return { value: a.Id, text: a.Name }; }));
+        var audience = field(form, 'Audience', select('audience', audiences, ev.Audience || 'everyone'));
+        audience.addEventListener('change', function () { ev.Audience = audience.value; });
         drawChanges(form, ev);
         if (state.editorError) form.appendChild(el('p', state.editorError, 'em-prog-error')).setAttribute('role', 'alert');
 

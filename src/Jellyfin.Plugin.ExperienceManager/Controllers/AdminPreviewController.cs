@@ -15,7 +15,8 @@ namespace Jellyfin.Plugin.ExperienceManager.Controllers;
 /// </summary>
 /// <param name="At">The local date and time, <c>yyyy-MM-ddTHH:mm</c>, in the server's time zone.</param>
 /// <param name="Event">An event being edited, applied even as a draft or before it is saved; it replaces the stored event with its id.</param>
-public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event);
+/// <param name="Audience">Preview as a member of this audience; left out, as the edited event's audience, else as the signed-in admin.</param>
+public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event, string? Audience = null);
 
 /// <summary>
 /// A page as it would be at a moment.
@@ -83,7 +84,7 @@ public class AdminPreviewController : ControllerBase
         var edited = request.Event;
         if (edited is not null)
         {
-            if (EventStore.Validate(edited) is { } error)
+            if (_events.Check(edited) is { } error)
             {
                 return BadRequest(new { Error = error });
             }
@@ -100,7 +101,8 @@ public class AdminPreviewController : ControllerBase
         }
 
         var active = events.Where(e => (e.Published || ReferenceEquals(e, edited)) && Schedules.IsActive(e.Schedule, at)).ToList();
-        var sections = _pages.Preview(pageId, user, active, out var hidden);
+        var audience = request.Audience ?? (edited is { Audience: not EventAudiences.Everyone } ? edited.Audience : null);
+        var sections = _pages.Preview(pageId, user, active, audience, out var hidden);
         return new AdminPreviewResponse(request.At!, active.Select(e => e.Name).ToList(), sections, hidden);
     }
 }

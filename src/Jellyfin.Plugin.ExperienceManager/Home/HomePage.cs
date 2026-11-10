@@ -74,8 +74,9 @@ public interface IPages
     /// </summary>
     /// <param name="pageId">The page id.</param>
     /// <param name="utcOffset">The viewer's UTC offset in minutes, or null for the server's time zone.</param>
+    /// <param name="user">The viewer, whose audiences decide their layout and events; null for the server layout.</param>
     /// <returns>The version, or null if there is no such page.</returns>
-    string? LayoutVersion(string pageId, int? utcOffset = null);
+    string? LayoutVersion(string pageId, int? utcOffset = null, User? user = null);
 
     /// <summary>
     /// Gets a page's sections for a user, in order, with the events on in the viewer's local time.

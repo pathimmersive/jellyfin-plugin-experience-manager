@@ -70,7 +70,7 @@ public sealed partial class HomePageService
     /// <returns>The page, or null if there is no such page.</returns>
     public PageResponse? BuildPage(User user, string pageId, int itemSections, ItemShape shape, int? utcOffset, out IReadOnlyList<SectionTiming> timings)
     {
-        var layoutVersion = _pages.LayoutVersion(pageId, utcOffset);
+        var layoutVersion = _pages.LayoutVersion(pageId, utcOffset, user);
         if (layoutVersion is null)
         {
             timings = [];

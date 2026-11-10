@@ -65,6 +65,16 @@
             #experienceManagerPage .em-prog-change { border-top: 1px solid rgba(128, 128, 128, .25); padding: .5em 0; }
             #experienceManagerPage .em-prog-actions { display: flex; flex-wrap: wrap; gap: .5em; }
             #experienceManagerPage .em-prog-mark, #experienceManagerPage .em-prog-hidden { opacity: .8; font-style: italic; }
+            #experienceManagerPage .em-aud-list { list-style: none; padding: 0; margin: .5em 0 1em; }
+            #experienceManagerPage .em-aud-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6em; padding: .5em; margin: 0 0 .4em; border: 1px solid rgba(128, 128, 128, .3); border-radius: .3em; }
+            #experienceManagerPage .em-aud-text { flex: 1 1 14em; min-width: 0; }
+            #experienceManagerPage .em-aud-name { font-weight: 600; }
+            #experienceManagerPage .em-aud-members, #experienceManagerPage .em-aud-kind { font-size: .85em; opacity: .75; }
+            #experienceManagerPage .em-aud-badge { font-size: .75em; padding: .1em .4em; border-radius: .2em; background: rgba(0, 164, 220, .45); }
+            #experienceManagerPage .em-aud-days { width: 5em; }
+            #experienceManagerPage .em-aud-form { margin: 1.5em 0; padding: 1em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; max-width: 40em; box-sizing: border-box; }
+            #experienceManagerPage .em-aud-users { display: flex; flex-wrap: wrap; gap: .4em 1.2em; margin: .6em 0; }
+            #experienceManagerPage .em-aud-error { color: #ff8a65; }
             @media (max-width: 600px) {
                 #experienceManagerPage .em-nav { gap: .8em; }
                 #experienceManagerPage .em-prog-field > span { flex-basis: 100%; }
@@ -84,7 +94,7 @@
                 // The admin pages, grouped as the plugin's design has them. Only the built ones open.
                 var groups = [
                     { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout' }, { id: 'programming', title: 'Programming', built: true }] },
-                    { title: 'People', pages: [{ id: 'audiences', title: 'Audiences' }, { id: 'defaults', title: 'Group defaults' }] },
+                    { title: 'People', pages: [{ id: 'audiences', title: 'Audiences', built: true }, { id: 'defaults', title: 'Group defaults' }] },
                     { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules' }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
                     { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History' }, { id: 'backup', title: 'Backup' }] }
@@ -148,7 +158,11 @@
                         return;
                     }
                     if (current === 'programming') {
-                        drawProgramming(panel);
+                        drawScript(panel, 'admin-programming.js', 'ExperienceManagerProgramming');
+                        return;
+                    }
+                    if (current === 'audiences') {
+                        drawScript(panel, 'admin-audiences.js', 'ExperienceManagerAudiences');
                         return;
                     }
                     panel.appendChild(el('p', 'Which apps your users watch on, and what Experience Manager reaches on each. Every device registered with this server is counted.'));
@@ -162,20 +176,21 @@
                     });
                 }
 
-                // The Programming page is its own script, loaded the first time it opens.
-                function drawProgramming(panel) {
-                    if (window.ExperienceManagerProgramming) {
-                        window.ExperienceManagerProgramming.draw(panel);
+                // Programming and Audiences are scripts of their own, each loaded the first time its page opens.
+                function drawScript(panel, file, name) {
+                    var opened = current;
+                    if (window[name]) {
+                        window[name].draw(panel);
                         return;
                     }
                     var status = panel.appendChild(el('p', 'Loading…', 'em-muted'));
                     var script = document.createElement('script');
-                    script.src = ApiClient.getUrl('ExperienceManager/admin-programming.js');
+                    script.src = ApiClient.getUrl('ExperienceManager/' + file);
                     script.onload = function () {
                         status.remove();
-                        if (current === 'programming') window.ExperienceManagerProgramming.draw(panel);
+                        if (current === opened) window[name].draw(panel);
                     };
-                    script.onerror = function () { status.textContent = 'The Programming page could not be loaded. Reload the page to try again.'; };
+                    script.onerror = function () { status.textContent = 'This page could not be loaded. Reload the page to try again.'; };
                     document.head.appendChild(script);
                 }
 
