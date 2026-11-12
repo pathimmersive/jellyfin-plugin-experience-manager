@@ -22,7 +22,28 @@ namespace Jellyfin.Plugin.ExperienceManager.Home;
 /// <param name="Display">How it is shown: <c>row</c> or <c>feature</c>.</param>
 /// <param name="Event">The event that added or changed it, or null.</param>
 /// <param name="Change">What that event did: one of the change kinds, or null.</param>
-public sealed record PreviewSection(string Id, string Title, string Source, string Display, string? Event, string? Change);
+/// <param name="Items">Its first items, when the preview asked for them.</param>
+/// <param name="Notes">What each content rule left out of it.</param>
+public sealed record PreviewSection(string Id, string Title, string Source, string Display, string? Event, string? Change, IReadOnlyList<PreviewItem>? Items = null, IReadOnlyList<string>? Notes = null);
+
+/// <summary>
+/// An item in a previewed section, enough to draw its card.
+/// </summary>
+/// <param name="Id">The item's id.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Year">Its production year, if known.</param>
+/// <param name="HasPrimary">Whether it has a poster.</param>
+/// <param name="HasBackdrop">Whether it has a backdrop.</param>
+public sealed record PreviewItem(Guid Id, string Name, int? Year, bool HasPrimary, bool HasBackdrop);
+
+/// <summary>
+/// A previewed page and why it looks that way.
+/// </summary>
+/// <param name="Sections">The sections, in order.</param>
+/// <param name="Hidden">The sections events hid.</param>
+/// <param name="Audiences">The audiences the viewer is in, highest first.</param>
+/// <param name="LayoutAudience">The audience whose layout the viewer gets, or null for Everyone's.</param>
+public sealed record PreviewPage(IReadOnlyList<PreviewSection> Sections, IReadOnlyList<PreviewHidden> Hidden, IReadOnlyList<string> Audiences, string? LayoutAudience);
 
 /// <summary>
 /// A section an event hid in a previewed page.
@@ -137,25 +158,60 @@ public sealed class StoredPages : IPages
     /// <returns>The sections, or none if there is no such page.</returns>
     public IReadOnlyList<PreviewSection> Preview(string pageId, User user, IReadOnlyList<ProgrammedEvent> active, string? audience, out IReadOnlyList<PreviewHidden> hidden)
     {
+        var preview = Preview(pageId, user, active, audience, 0);
+        hidden = preview.Hidden;
+        return preview.Sections;
+    }
+
+    /// <summary>
+    /// Resolves a page for a viewer on the draft with the given events, and says why it looks that way: the viewer's
+    /// audiences, whose layout they get, the event behind each section, what each content rule left out, and, when
+    /// asked, each section's first items. Nothing is stored.
+    /// </summary>
+    /// <param name="pageId">The page id.</param>
+    /// <param name="user">The viewer: their libraries, parental controls and audiences count.</param>
+    /// <param name="active">The events to apply, highest first; those for other audiences are left out.</param>
+    /// <param name="audience">Preview as a member of this audience only, as no audience's member for 'everyone', or null for the viewer's own audiences.</param>
+    /// <param name="items">How many items to give each section; none when 0.</param>
+    /// <returns>The page, or an empty one if there is no such page.</returns>
+    public PreviewPage Preview(string pageId, User user, IReadOnlyList<ProgrammedEvent> active, string? audience, int items)
+    {
         var page = _store.Get(pageId);
         if (page is null)
         {
-            hidden = [];
-            return [];
+            return new PreviewPage([], [], [], null);
         }
 
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
-        var audiences = audience is null || audience == EventAudiences.Everyone ? AudiencesOf(user) : [audience];
-        var expanded = Expand(LayoutOf(page, audiences).Sections, views);
+        IReadOnlyList<string> audiences = audience is null ? AudiencesOf(user) : audience == EventAudiences.Everyone ? [] : [audience];
+        var layout = LayoutOf(page, audiences);
+        var expanded = Expand(layout.Sections, views);
         var titles = expanded.ToDictionary(s => s.Id, s => Build(new PageSlot(s, false), views)?.Title ?? s.Id, StringComparer.OrdinalIgnoreCase);
         var gone = new List<HiddenSection>();
+        var raws = new Dictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>(StringComparer.OrdinalIgnoreCase);
         var sections = EventOverlay.Apply(expanded, active.Where(e => Applies(e, audiences)).ToList(), gone)
-            .Select(slot => (Slot: slot, Section: Build(slot, views)))
+            .Select(slot => (Slot: slot, Section: Build(slot, views, raws)))
             .Where(p => p.Section is not null)
-            .Select(p => new PreviewSection(p.Section!.Id, p.Section.Title, p.Section.Source.Kind, p.Section.Display.Hint, p.Slot.Event, p.Slot.Change))
+            .Select(p => Describe(p.Section!, p.Slot, raws.GetValueOrDefault(p.Section!.Id), user, audiences, items))
             .ToList();
-        hidden = gone.Select(h => new PreviewHidden(h.Id, titles.GetValueOrDefault(h.Id) ?? h.Id, h.Event)).ToList();
-        return sections;
+        var hidden = gone.Select(h => new PreviewHidden(h.Id, titles.GetValueOrDefault(h.Id) ?? h.Id, h.Event)).ToList();
+        return new PreviewPage(sections, hidden, audiences, layout.AudienceId);
+    }
+
+    private PreviewSection Describe(PageSection section, PageSlot slot, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load) raw, User user, IReadOnlyList<string> audiences, int count)
+    {
+        var notes = new List<string>();
+        List<PreviewItem>? items = null;
+        if (count > 0 && raw.Load is not null)
+        {
+            var loaded = raw.Load(user).Items;
+            var kept = _rules is null ? loaded : _rules.Apply(raw.Target, user, audiences, loaded, notes, draft: true);
+            items = kept.Take(slot.Feature ? FeaturedCount : count)
+                .Select(i => new PreviewItem(i.Id, i.Name, i.ProductionYear, i.HasImage(MediaBrowser.Model.Entities.ImageType.Primary, 0), i.HasImage(MediaBrowser.Model.Entities.ImageType.Backdrop, 0)))
+                .ToList();
+        }
+
+        return new PreviewSection(section.Id, section.Title, section.Source.Kind, section.Display.Hint, slot.Event, slot.Change, items, notes);
     }
 
     /// <summary>
@@ -272,7 +328,7 @@ public sealed class StoredPages : IPages
     private ActiveEvents Active(string pageId, int? utcOffset) =>
         pageId == PageIds.Home ? _events.For(utcOffset) : new ActiveEvents([], string.Empty, null);
 
-    private PageSection? Build(PageSlot slot, Lazy<IReadOnlyList<LibraryView>> views)
+    private PageSection? Build(PageSlot slot, Lazy<IReadOnlyList<LibraryView>> views, IDictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>? raws = null)
     {
         var stored = slot.Section;
         var config = new SectionConfig(stored.Config);
@@ -281,7 +337,13 @@ public sealed class StoredPages : IPages
         var feature = new SectionDisplay("feature", "landscape");
         PageSection Section(string title, SectionDisplay display, SectionSource source, SeeAllTarget? seeAll, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> load)
         {
-            var ruled = Ruled(new RuleTarget(stored.Type, slot.Feature, config.Strings("RulesOff")), load);
+            var target = new RuleTarget(stored.Type, slot.Feature, config.Strings("RulesOff"));
+            if (raws is not null)
+            {
+                raws[stored.Id] = (target, load);
+            }
+
+            var ruled = Ruled(target, load);
             return slot.Feature
                 ? new(stored.Id, title, feature, source, seeAll, FeaturedCount, ruled)
                 : new(stored.Id, title, display, source, seeAll, RowCount, ruled);

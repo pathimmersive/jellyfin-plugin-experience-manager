@@ -27,6 +27,7 @@ public sealed record RuleTarget(string Type, bool Feature, IReadOnlyCollection<s
 public sealed class RuleFilter
 {
     private readonly Func<ContentRules> _rules;
+    private readonly Func<ContentRules> _draft;
     private readonly Func<int> _revision;
     private readonly ILocalizationManager _localization;
     private readonly IUserDataManager _userData;
@@ -36,10 +37,11 @@ public sealed class RuleFilter
     /// Initializes a new instance of the <see cref="RuleFilter"/> class.
     /// </summary>
     /// <param name="rules">The published version, whose rules Home serves.</param>
+    /// <param name="draft">The draft rules, which previews apply.</param>
     /// <param name="localization">Jellyfin's ratings.</param>
     /// <param name="userData">Jellyfin's user data.</param>
-    public RuleFilter(Publishing.PublishStore rules, ILocalizationManager localization, IUserDataManager userData)
-        : this(() => rules.Live.Rules, () => rules.Version, localization, userData, TimeProvider.System)
+    public RuleFilter(Publishing.PublishStore rules, RulesStore draft, ILocalizationManager localization, IUserDataManager userData)
+        : this(() => rules.Live.Rules, () => rules.Version, localization, userData, TimeProvider.System, () => draft.Rules)
     {
     }
 
@@ -48,9 +50,10 @@ public sealed class RuleFilter
     {
     }
 
-    internal RuleFilter(Func<ContentRules> rules, Func<int> revision, ILocalizationManager localization, IUserDataManager userData, TimeProvider time)
+    internal RuleFilter(Func<ContentRules> rules, Func<int> revision, ILocalizationManager localization, IUserDataManager userData, TimeProvider time, Func<ContentRules>? draft = null)
     {
         _rules = rules;
+        _draft = draft ?? rules;
         _revision = revision;
         _localization = localization;
         _userData = userData;
@@ -69,17 +72,39 @@ public sealed class RuleFilter
     /// <param name="user">The viewer.</param>
     /// <param name="audiences">The viewer's audiences, highest first, for the rating ceiling.</param>
     /// <param name="items">The section's items, in order.</param>
+    /// <param name="notes">Collects what each rule left out, for the preview's why panel, when given.</param>
+    /// <param name="draft">Whether to apply the draft rules, as previews do, rather than the published ones.</param>
     /// <returns>The items the rules let through, in order.</returns>
-    public IReadOnlyList<BaseItem> Apply(RuleTarget target, User user, IReadOnlyList<string> audiences, IReadOnlyList<BaseItem> items)
+    public IReadOnlyList<BaseItem> Apply(RuleTarget target, User user, IReadOnlyList<string> audiences, IReadOnlyList<BaseItem> items, ICollection<string>? notes = null, bool draft = false)
     {
-        var rules = _rules();
+        var rules = draft ? _draft() : _rules();
         bool On(string rule, bool enabled) => enabled && !target.OptedOut.Contains(rule, StringComparer.OrdinalIgnoreCase);
         IEnumerable<BaseItem> result = items;
+        var count = items.Count;
+
+        // Only when explaining: count what a rule left out, so the request path stays lazy.
+        void Noted(string rule)
+        {
+            if (notes is null)
+            {
+                return;
+            }
+
+            var kept = result.ToList();
+            if (kept.Count < count)
+            {
+                notes.Add($"{rule} left out {count - kept.Count} {(count - kept.Count == 1 ? "item" : "items")}");
+            }
+
+            count = kept.Count;
+            result = kept;
+        }
 
         if (On(RuleIds.Tags, rules.ExcludeTags) && rules.ExcludedTags is { Count: > 0 } tags)
         {
             var excluded = new HashSet<string>(tags, StringComparer.OrdinalIgnoreCase);
             result = result.Where(i => !(i.Tags ?? []).Any(excluded.Contains));
+            Noted("Excluded tags");
         }
 
         if (target.Feature)
@@ -87,28 +112,36 @@ public sealed class RuleFilter
             if (On(RuleIds.FeatureArt, rules.FeatureArt))
             {
                 result = result.Where(i => i.HasImage(ImageType.Backdrop, 0) && (!rules.RequireLogo || i.HasImage(ImageType.Logo, 0)));
+                Noted("Artwork for features");
             }
 
             if (On(RuleIds.Ceiling, rules.CeilingOn) && CeilingFor(rules, audiences) is { } ceiling && _localization.GetRatingScore(ceiling, null) is { } max)
             {
                 result = result.Where(i => Score(i) is { } score && (score.Score < max.Score || (score.Score == max.Score && (score.SubScore ?? 0) <= (max.SubScore ?? 0))));
+                Noted($"The {ceiling} ceiling");
             }
         }
         else if (On(RuleIds.Poster, rules.Poster) && target.Type != SectionTypes.MyMedia)
         {
             // Titles need a poster; episodes and libraries draw from other images.
             result = result.Where(i => i is not (Movie or Series or BoxSet) || i.HasImage(ImageType.Primary, 0));
+            Noted("Require a poster");
         }
 
         if (On(RuleIds.Versions, rules.Versions))
         {
             result = OneOfEach(result);
+            Noted("Collapse versions");
         }
 
         var list = result.ToList();
         if (target.Type == SectionTypes.ContinueWatching && On(RuleIds.ContinueCleanup, rules.ContinueCleanup) && list.Count > 0)
         {
             list = CleanUp(rules, user, list);
+            if (notes is not null && list.Count < count)
+            {
+                notes.Add($"Continue Watching clean-up left out {count - list.Count} {(count - list.Count == 1 ? "item" : "items")}");
+            }
         }
 
         return list;

@@ -15,8 +15,10 @@ namespace Jellyfin.Plugin.ExperienceManager.Controllers;
 /// </summary>
 /// <param name="At">The local date and time, <c>yyyy-MM-ddTHH:mm</c>, in the server's time zone.</param>
 /// <param name="Event">An event being edited, applied even as a draft or before it is saved; it replaces the stored event with its id.</param>
-/// <param name="Audience">Preview as a member of this audience; left out, as the edited event's audience, else as the signed-in admin.</param>
-public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event, string? Audience = null);
+/// <param name="Audience">Preview as a member of this audience; left out, as the edited event's audience, else as the viewer.</param>
+/// <param name="UserId">Preview as this user, with their libraries, parental controls and audiences; the signed-in admin when left out.</param>
+/// <param name="Items">How many items to give each section, up to 24; none when left out.</param>
+public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event, string? Audience = null, Guid? UserId = null, int? Items = null);
 
 /// <summary>
 /// A page as it would be at a moment.
@@ -25,7 +27,11 @@ public sealed record AdminPreviewRequest(string? At, ProgrammedEvent? Event, str
 /// <param name="Events">The events on at that moment, highest first.</param>
 /// <param name="Sections">The sections, in order, each with the event that changed it.</param>
 /// <param name="Hidden">The sections events hid.</param>
-public sealed record AdminPreviewResponse(string At, IReadOnlyList<string> Events, IReadOnlyList<PreviewSection> Sections, IReadOnlyList<PreviewHidden> Hidden);
+/// <param name="Viewer">Whose Home it is.</param>
+/// <param name="Audiences">The audiences that count for the viewer, highest first, by name.</param>
+/// <param name="Layout">Whose layout the viewer gets: an audience's name, or Everyone's.</param>
+/// <param name="LayoutAudience">That audience's id, or null for Everyone's.</param>
+public sealed record AdminPreviewResponse(string At, IReadOnlyList<string> Events, IReadOnlyList<PreviewSection> Sections, IReadOnlyList<PreviewHidden> Hidden, string Viewer, IReadOnlyList<string> Audiences, string Layout, string? LayoutAudience);
 
 /// <summary>
 /// A layout's badges.
@@ -45,6 +51,7 @@ public class AdminPreviewController : ControllerBase
     private readonly StoredPages _pages;
     private readonly EventStore _events;
     private readonly IUserManager _users;
+    private readonly Audiences.AudienceStore? _audiences;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AdminPreviewController"/> class.
@@ -52,7 +59,14 @@ public class AdminPreviewController : ControllerBase
     /// <param name="pages">The stored pages.</param>
     /// <param name="events">The events.</param>
     /// <param name="users">The user manager.</param>
-    public AdminPreviewController(StoredPages pages, EventStore events, IUserManager users)
+    /// <param name="audiences">The audiences, for their names.</param>
+    public AdminPreviewController(StoredPages pages, EventStore events, IUserManager users, Audiences.AudienceStore audiences)
+        : this(pages, events, users)
+    {
+        _audiences = audiences;
+    }
+
+    internal AdminPreviewController(StoredPages pages, EventStore events, IUserManager users)
     {
         _pages = pages;
         _events = events;
@@ -96,6 +110,15 @@ public class AdminPreviewController : ControllerBase
             return Forbid();
         }
 
+        if (request.UserId is { } viewerId)
+        {
+            user = _users.GetUserById(viewerId);
+            if (user is null)
+            {
+                return BadRequest(new { Error = $"there is no user {viewerId:N}" });
+            }
+        }
+
         if (_pages.LayoutVersion(pageId) is null)
         {
             return NotFound();
@@ -128,7 +151,16 @@ public class AdminPreviewController : ControllerBase
 
         var active = events.Where(e => (e.Published || ReferenceEquals(e, edited)) && Schedules.IsActive(e.Schedule, at)).ToList();
         var audience = request.Audience ?? (edited is { Audience: not EventAudiences.Everyone } ? edited.Audience : null);
-        var sections = _pages.Preview(pageId, user, active, audience, out var hidden);
-        return new AdminPreviewResponse(request.At!, active.Select(e => e.Name).ToList(), sections, hidden);
+        var preview = _pages.Preview(pageId, user, active, audience, Math.Clamp(request.Items ?? 0, 0, 24));
+        string Name(string audienceId) => _audiences?.Get(audienceId)?.Name ?? audienceId;
+        return new AdminPreviewResponse(
+            request.At!,
+            active.Where(e => e.Audience == EventAudiences.Everyone || preview.Audiences.Contains(e.Audience, StringComparer.OrdinalIgnoreCase)).Select(e => e.Name).ToList(),
+            preview.Sections,
+            preview.Hidden,
+            user.Username,
+            preview.Audiences.Select(Name).ToList(),
+            preview.LayoutAudience is null ? "Everyone's" : Name(preview.LayoutAudience) + "'s",
+            preview.LayoutAudience);
     }
 }

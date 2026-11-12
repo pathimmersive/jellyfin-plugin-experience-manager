@@ -62,6 +62,13 @@ public class HomeClient
 
     private static readonly Lazy<string> _rulesScriptETag = new(() => ComputeETag(RulesScriptFileName));
 
+    /// <summary>
+    /// The admin page's context bar script, served beside the home client.
+    /// </summary>
+    public const string ContextScriptFileName = "admin-context.js";
+
+    private static readonly Lazy<string> _contextScriptETag = new(() => ComputeETag(ContextScriptFileName));
+
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
     private static readonly Lazy<string> _styleETag = new(() => ComputeETag(StyleFileName));
@@ -130,6 +137,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script.</returns>
     public Stream OpenRulesScript() => OpenResource(RulesScriptFileName);
+
+    /// <summary>
+    /// Gets the admin context bar script's entity tag, from its content.
+    /// </summary>
+    public string ContextScriptETag => _contextScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin context bar script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenContextScript() => OpenResource(ContextScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

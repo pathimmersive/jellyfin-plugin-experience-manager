@@ -264,9 +264,47 @@
         return changes(state.original, state.rows).total > 0;
     }
 
+    function context() {
+        return window.ExperienceManagerContext ? window.ExperienceManagerContext.get() : { who: 'everyone', device: 'tv', date: '', time: '' };
+    }
+
+    // The layout the bar names: Everyone's, an audience's, or for a user the one they get, read-only.
+    function follow() {
+        var ctx = context();
+        var who = String(ctx.who || 'everyone').split(':');
+        state.readOnly = null;
+        if (who[0] === 'audience') {
+            state.layout = who.slice(1).join(':');
+            return loadLayout();
+        }
+        if (who[0] !== 'user') {
+            state.layout = 'everyone';
+            return loadLayout();
+        }
+        return previewCall(ctx, 0).then(function (p) {
+            state.layout = p && p.LayoutAudience ? p.LayoutAudience : 'everyone';
+            state.readOnly = { viewer: p ? p.Viewer : who[1], layout: p ? p.Layout : 'Everyone\'s' };
+            return loadLayout();
+        });
+    }
+
+    function previewCall(ctx, items) {
+        var body = { At: ctx.date + 'T' + ctx.time, Items: items };
+        var who = window.ExperienceManagerContext ? window.ExperienceManagerContext.pure.previewFor(ctx) : { Audience: 'everyone' };
+        Object.keys(who).forEach(function (k) { body[k] = who[k]; });
+        return call('POST', ADMIN + 'Pages/home/Preview', body).then(function (r) { return r.ok ? r.body : null; });
+    }
+
     function draw(focusId) {
         if (!root) return;
         root.textContent = '';
+        if (state.readOnly) {
+            var note = root.appendChild(el('div', null, 'em-lay-readonly'));
+            note.appendChild(el('span', 'Showing the layout ' + state.readOnly.viewer + ' gets: ' + state.readOnly.layout + '. It is read-only here. '));
+            note.appendChild(button('Edit ' + state.readOnly.layout + ' layout', 'em-lay-edit-theirs', function () {
+                window.ExperienceManagerContext.set({ who: group() ? 'audience:' + state.layout : 'everyone' });
+            }));
+        }
         root.appendChild(el('p', group()
             ? 'Members of ' + groupName() + ' see this layout. It inherits Everyone\'s; only what you change here is stored for the group.'
             : 'Everyone sees this layout, unless an audience they are in has its own.'));
@@ -279,14 +317,15 @@
             var banner = root.appendChild(el('div', null, 'em-lay-banner'));
             banner.appendChild(el('span', summary.text, 'em-lay-unsaved'));
             banner.appendChild(button('Save', 'em-lay-save', save));
-            banner.appendChild(button('Discard', 'em-lay-discard', function () { loadLayout().then(function () { state.message = 'Changes discarded.'; draw(); }); }));
+            banner.appendChild(button('Discard', 'em-lay-discard', function () { (state.waiting ? follow() : loadLayout()).then(function () { state.waiting = false; state.message = 'Changes discarded.'; draw(); }); }));
         }
         if (state.error) root.appendChild(el('p', state.error, 'em-aud-error')).setAttribute('role', 'alert');
         if (state.message) root.appendChild(el('p', state.message, 'em-muted em-lay-message'));
         drawList();
         drawEventAdded();
-        if (state.adding) drawAdd();
-        if (state.selected != null && state.rows[state.selected]) drawSettings(state.rows[state.selected]);
+        if (state.adding && !state.readOnly) drawAdd();
+        if (state.selected != null && state.rows[state.selected] && !state.readOnly) drawSettings(state.rows[state.selected]);
+        drawPreview();
         if (focusId) {
             var row = root.querySelector('.em-lay-row[data-section="' + focusId + '"]');
             if (row) row.focus();
@@ -294,24 +333,64 @@
     }
 
     function drawToolbar() {
+        if (state.readOnly) return;
         var bar = root.appendChild(el('div', null, 'em-lay-toolbar'));
-        var label = bar.appendChild(el('label', null, 'em-prog-switch'));
-        label.appendChild(el('span', 'Layout'));
-        var picker = label.appendChild(el('select'));
-        picker.name = 'layout';
-        [{ Id: 'everyone', Name: 'Everyone' }].concat(state.audiences).forEach(function (a) {
-            var option = picker.appendChild(el('option', a.Name));
-            option.value = a.Id;
-            option.selected = a.Id === state.layout;
-        });
-        picker.disabled = dirty();
-        if (picker.disabled) picker.title = 'Save or discard your changes first';
-        picker.addEventListener('change', function () {
-            state.layout = picker.value;
-            state.message = '';
-            loadLayout().then(function () { draw(); });
-        });
+        if (state.waiting) bar.appendChild(el('span', 'Save or discard your changes to follow the bar.', 'em-aud-error em-lay-waiting'));
         bar.appendChild(button('Add a section', 'em-lay-add-open', function () { state.adding = !state.adding; draw(); }));
+    }
+
+    // Home for the bar's viewer, device and date, on the draft, with why it looks that way.
+    function drawPreview() {
+        var ctx = context();
+        var wrap = root.appendChild(el('div', null, 'em-preview-wrap'));
+        var frame = wrap.appendChild(el('div', null, 'em-frame em-frame-' + (ctx.device || 'tv')));
+        frame.setAttribute('data-device', ctx.device || 'tv');
+        frame.appendChild(el('p', 'Loading the preview…', 'em-muted'));
+        var why = wrap.appendChild(el('div', null, 'em-why'));
+        previewCall(ctx, 12).then(function (p) {
+            if (!frame.isConnected) return;
+            frame.textContent = '';
+            if (!p) { frame.appendChild(el('p', 'The preview could not be made.', 'em-aud-error')); return; }
+            p.Sections.forEach(function (s) {
+                var image = function (item, type, height) {
+                    return 'url("' + ApiClient.getUrl('Items/' + item.Id + '/Images/' + type, { maxHeight: height, quality: 80 }) + '")';
+                };
+                if (s.Display === 'feature') {
+                    var first = (s.Items || [])[0];
+                    var banner = frame.appendChild(el('div', null, 'em-pv-banner'));
+                    banner.setAttribute('data-section', s.Id);
+                    if (first && first.HasBackdrop) banner.style.backgroundImage = image(first, 'Backdrop', 400);
+                    banner.appendChild(el('span', first ? first.Name : s.Title));
+                    return;
+                }
+                var row = frame.appendChild(el('div', null, 'em-pv-row'));
+                row.setAttribute('data-section', s.Id);
+                row.appendChild(el('h4', s.Title));
+                var cards = row.appendChild(el('div', null, 'em-pv-cards'));
+                (s.Items || []).forEach(function (item) {
+                    var card = cards.appendChild(el('div', item.HasPrimary ? '' : item.Name, 'em-pv-card'));
+                    card.title = item.Name;
+                    if (item.HasPrimary) card.style.backgroundImage = image(item, 'Primary', 240);
+                });
+                if (!(s.Items || []).length) cards.appendChild(el('span', 'Nothing to show for this viewer.', 'em-muted'));
+            });
+            drawWhy(why, p);
+        });
+    }
+
+    function drawWhy(box, p) {
+        box.appendChild(el('h3', 'Why it looks like this'));
+        var list = box.appendChild(el('ul'));
+        function line(text, kind) { list.appendChild(el('li', text)).setAttribute('data-why', kind); }
+        line('Viewing as ' + p.Viewer + (p.Audiences.length ? ', in ' + p.Audiences.join(', ') : ', in no audience'), 'viewer');
+        line('Layout: ' + p.Layout, 'layout');
+        line(p.Events.length ? 'Events on: ' + p.Events.join(', ') : 'No event is on then.', 'events');
+        var verbs = { insert: 'added by', swap: 'swapped by', featured: 'featured by' };
+        p.Sections.forEach(function (s) {
+            if (s.Event) line(s.Title + ': ' + verbs[s.Change] + ' ' + s.Event, 'event');
+            (s.Notes || []).forEach(function (n) { line(s.Title + ': ' + n, 'rule'); });
+        });
+        p.Hidden.forEach(function (h) { line(h.Title + ': hidden by ' + h.Event, 'event'); });
     }
 
     function badgesOf(id) {
@@ -330,7 +409,7 @@
             row.setAttribute('data-section', s.Id);
             row.setAttribute('data-mark', r.mark);
             if (state.selected === index) row.setAttribute('aria-selected', 'true');
-            row.draggable = true;
+            row.draggable = !state.readOnly;
             row.addEventListener('dragstart', function (ev) { ev.dataTransfer.setData('text/plain', String(index)); ev.dataTransfer.effectAllowed = 'move'; });
             row.addEventListener('dragover', function (ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; });
             row.addEventListener('drop', function (ev) {
@@ -340,13 +419,14 @@
             });
             row.addEventListener('keydown', function (ev) { if (ev.target === row) onKey(ev, index); });
             row.addEventListener('click', function () { state.selected = index; draw(); });
-            row.appendChild(el('span', '⠿', 'em-prog-handle')).setAttribute('aria-hidden', 'true');
+            if (!state.readOnly) row.appendChild(el('span', '⠿', 'em-prog-handle')).setAttribute('aria-hidden', 'true');
             var text = row.appendChild(el('div', null, 'em-lay-text'));
             text.appendChild(el('div', titleOf(s), 'em-lay-title'));
             text.appendChild(el('div', typeOf(s.Type).name + (s.Off ? ' · off' : ''), 'em-lay-type'));
             if (group()) text.appendChild(el('div', MARKS[r.mark] + (r.mark === 'inherited' ? '' : groupName()), 'em-lay-mark'));
             badgesOf(s.Id).forEach(function (b) { text.appendChild(el('span', b.Text, 'em-lay-badge' + (b.Kind === 'source-missing' ? ' em-missing' : ''))); });
 
+            if (state.readOnly) return;
             if (r.mark !== 'removed') {
                 var switchLabel = row.appendChild(el('label', null, 'em-prog-switch'));
                 var on = switchLabel.appendChild(el('input'));
@@ -580,20 +660,34 @@
                 draw();
                 return;
             }
-            loadLayout().then(function () {
+            (state.waiting ? follow() : loadLayout()).then(function () {
+                state.waiting = false;
                 state.message = 'Saved ' + (group() ? groupName() + '\'s' : 'Everyone\'s') + ' layout.';
                 draw();
             });
         });
     }
 
+    // The bar moved: follow it, unless that would lose unsaved edits.
+    document.addEventListener('em-context-changed', function () {
+        if (!root || !root.isConnected) return;
+        if (dirty()) {
+            state.waiting = true;
+            draw();
+            return;
+        }
+        state.waiting = false;
+        follow().then(function () { draw(); });
+    });
+
     window.ExperienceManagerLayout = {
         draw: function (panel) {
             root = panel.appendChild(el('div', null, 'em-lay'));
             state.message = '';
             state.adding = false;
+            state.waiting = false;
             var status = root.appendChild(el('p', 'Loading…', 'em-muted'));
-            loadSources().then(loadLayout).then(function () {
+            loadSources().then(follow).then(function () {
                 status.remove();
                 draw();
             }, function () {

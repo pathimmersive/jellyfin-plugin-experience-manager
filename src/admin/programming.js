@@ -331,6 +331,25 @@
         });
     }
 
+    function barDate() {
+        var ctx = window.ExperienceManagerContext && window.ExperienceManagerContext.get();
+        if (!ctx) return;
+        var parts = ctx.date.split('-');
+        state.date = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+        state.previewAt = ctx.date + 'T' + ctx.time;
+    }
+
+    document.addEventListener('em-context-changed', function () {
+        if (!root || !root.isConnected) return;
+        barDate();
+        draw();
+        if (state.previewPending) {
+            state.previewPending = false;
+            var run = root.querySelector('.em-prog-run-preview');
+            if (run) run.click();
+        }
+    });
+
     function draw() {
         if (!root) return;
         root.textContent = '';
@@ -714,6 +733,16 @@
         at.addEventListener('change', function () { state.previewAt = at.value; });
         preview.appendChild(button('Preview', 'em-prog-run-preview', function () {
             state.previewAt = at.value;
+            if (window.ExperienceManagerContext && at.value) {
+                var picked = at.value.split('T');
+                var ctx = window.ExperienceManagerContext.get();
+                if (ctx.date !== picked[0] || ctx.time !== picked[1]) {
+                    // Setting the bar redraws the page; the preview runs once it has.
+                    state.previewPending = true;
+                    window.ExperienceManagerContext.set({ date: picked[0], time: picked[1] });
+                    return;
+                }
+            }
             var body = eventToSend(ev);
             if (!body.Id) body.Id = slug(body.Name) + '-preview';
             call('POST', BASE + 'Pages/home/Preview', { At: at.value, Event: body }).then(function (r) {
@@ -744,11 +773,13 @@
     }
 
     window.ExperienceManagerProgramming = {
+        pure: pure,
         draw: function (panel) {
             root = panel.appendChild(el('div', null, 'em-prog'));
             var status = root.appendChild(el('p', 'Loading…', 'em-muted'));
             load().then(function () {
                 status.remove();
+                barDate();
                 draw();
             }, function () {
                 status.textContent = 'The events could not be loaded. Reload the page to try again.';
