@@ -103,10 +103,12 @@ find_api() {
 find_api
 
 # Waits until the server log matches a pattern; fails on timeout or container exit.
+# Waits for a line in the server's log; with a time, only lines logged since then count, so a line from
+# before a restart cannot end the wait early.
 wait_for_log() {
-  local pattern="$1" deadline=$((SECONDS + timeout))
+  local pattern="$1" since="${2:-}" deadline=$((SECONDS + timeout))
   while (( SECONDS < deadline )); do
-    if docker logs "$server_container" 2>&1 | grep -Eq "$pattern"; then
+    if docker logs ${since:+--since "$since"} "$server_container" 2>&1 | grep -Eq "$pattern"; then
       return 0
     fi
     if [[ "$(docker inspect -f '{{.State.Running}}' "$server_container")" != "true" ]]; then
@@ -157,8 +159,11 @@ install() {
 restart_and_check() {
   local v="$1" plugins entries entry page
   echo "== restart and wait for $plugin_name $v to load"
+  local restarted
+  restarted="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   docker restart "$server_container" >/dev/null
-  wait_for_log "Loaded plugin: \"?${plugin_name}\"? \"?${v}\"?"
+  wait_for_log "Loaded plugin: \"?${plugin_name}\"? \"?${v}\"?" "$restarted"
+  wait_for_log "Startup complete" "$restarted"
   find_api
   local deadline=$((SECONDS + timeout))
   until curl -sf "$api/System/Info/Public" >/dev/null 2>&1; do
