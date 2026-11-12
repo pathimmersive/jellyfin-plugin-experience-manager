@@ -94,6 +94,11 @@
             #experienceManagerPage .em-lay-types { list-style: none; padding: 0; }
             #experienceManagerPage .em-lay-types li { margin: .4em 0; }
             #experienceManagerPage .em-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+            #experienceManagerPage .em-rule { margin: 0 0 1em; padding: .8em 1em; border: 1px solid rgba(128, 128, 128, .3); border-radius: .4em; max-width: 46em; box-sizing: border-box; }
+            #experienceManagerPage .em-rule h3 { margin: 0 0 .3em; font-size: 1em; }
+            #experienceManagerPage .em-rule-optouts { font-size: .85em; opacity: .75; }
+            #experienceManagerPage .em-rule input[type="number"] { width: 5em; }
+            #experienceManagerPage .em-lay-rules { display: flex; flex-wrap: wrap; gap: .3em 1.2em; }
             @media (max-width: 600px) {
                 #experienceManagerPage .em-nav { gap: .8em; }
                 #experienceManagerPage .em-prog-field > span { flex-basis: 100%; }
@@ -114,7 +119,7 @@
                 var groups = [
                     { title: 'Experience', pages: [{ id: 'layout', title: 'Home layout', built: true }, { id: 'programming', title: 'Programming', built: true }] },
                     { title: 'People', pages: [{ id: 'audiences', title: 'Audiences', built: true }, { id: 'defaults', title: 'Group defaults' }] },
-                    { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules' }, { id: 'integrations', title: 'Integrations' }] },
+                    { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules', built: true }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
                     { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History' }, { id: 'backup', title: 'Backup' }] }
                 ];
@@ -182,6 +187,10 @@
                     }
                     if (current === 'layout') {
                         drawScript(panel, 'admin-layout.js', 'ExperienceManagerLayout');
+                        return;
+                    }
+                    if (current === 'rules') {
+                        drawScript(panel, 'admin-rules.js', 'ExperienceManagerRules');
                         return;
                     }
                     if (current === 'audiences') {

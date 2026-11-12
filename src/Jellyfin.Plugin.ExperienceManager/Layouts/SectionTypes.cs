@@ -52,6 +52,11 @@ public static class SectionTypes
     public static string? ValidateConfig(StoredSection section)
     {
         var config = new SectionConfig(section.Config);
+        if (config.Strings("RulesOff").FirstOrDefault(r => !Rules.RuleIds.All.Contains(r)) is { } unknown)
+        {
+            return $"section {section.Id} opts out of an unknown rule '{unknown}'";
+        }
+
         return section.Type switch
         {
             Latest when config.Guid("Library") is null => $"section {section.Id} needs a Library id",

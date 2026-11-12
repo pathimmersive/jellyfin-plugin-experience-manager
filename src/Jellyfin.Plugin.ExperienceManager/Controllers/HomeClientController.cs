@@ -77,6 +77,16 @@ public class HomeClientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public ActionResult GetLayoutScript() => Serve(_client.LayoutScriptETag, _client.OpenLayoutScript, HomeClient.ScriptContentType);
 
+    /// <summary>
+    /// Gets the admin page's Content rules script. The routes it calls are for administrators only.
+    /// </summary>
+    /// <returns>The script, or 304 when the client already has it.</returns>
+    [HttpGet(HomeClient.RulesScriptFileName)]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public ActionResult GetRulesScript() => Serve(_client.RulesScriptETag, _client.OpenRulesScript, HomeClient.ScriptContentType);
+
     private ActionResult Serve(string etag, Func<Stream> open, string contentType)
     {
         Response.Headers.CacheControl = "no-cache";
