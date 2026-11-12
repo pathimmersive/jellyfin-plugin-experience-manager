@@ -60,12 +60,13 @@ public sealed class AudienceResolver
     /// </summary>
     /// <param name="page">The page.</param>
     /// <param name="audiences">The user's audiences, highest first.</param>
+    /// <param name="layouts">Where the group layouts come from; the draft when left out.</param>
     /// <returns>The layout.</returns>
-    public ResolvedLayout LayoutFor(StoredPage page, IReadOnlyList<string> audiences)
+    public ResolvedLayout LayoutFor(StoredPage page, IReadOnlyList<string> audiences, Func<string, StoredGroupLayout?>? layouts = null)
     {
         foreach (var id in audiences)
         {
-            if (_audiences.Layout(id, page.Id) is { } layout)
+            if ((layouts is null ? _audiences.Layout(id, page.Id) : layouts(id)) is { } layout)
             {
                 return new ResolvedLayout(layout.AudienceId, layout.Revision, GroupLayouts.Resolve(page.Sections, layout.Entries));
             }

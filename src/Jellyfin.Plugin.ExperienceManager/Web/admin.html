@@ -121,7 +121,7 @@
                     { title: 'People', pages: [{ id: 'audiences', title: 'Audiences', built: true }, { id: 'defaults', title: 'Group defaults' }] },
                     { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules', built: true }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
-                    { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History' }, { id: 'backup', title: 'Backup' }] }
+                    { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History', built: true }, { id: 'backup', title: 'Backup' }] }
                 ];
                 var current = 'clients';
 
@@ -181,6 +181,11 @@
                         panel.appendChild(el('p', 'Coming later.', 'em-muted'));
                         return;
                     }
+                    if (drafted.indexOf(current) >= 0) drawBanner(panel.appendChild(el('div', null, 'em-publish')));
+                    if (current === 'history') {
+                        drawHistory(panel);
+                        return;
+                    }
                     if (current === 'programming') {
                         drawScript(panel, 'admin-programming.js', 'ExperienceManagerProgramming');
                         return;
@@ -205,6 +210,101 @@
                         drawCensus(panel, census);
                     }, function () {
                         status.textContent = 'The census could not be loaded. Reload the page to try again.';
+                    });
+                }
+
+                // The pages that edit what is drafted: their edits wait in the draft until Publish.
+                var drafted = ['layout', 'programming', 'rules'];
+
+                function adminCall(method, path) {
+                    return fetch(ApiClient.getUrl('ExperienceManager/Admin/' + path), { method: method, headers: { Authorization: 'MediaBrowser Token="' + ApiClient.accessToken() + '"' } })
+                        .then(function (r) { return r.text().then(function (t) { var b = null; try { b = t ? JSON.parse(t) : null; } catch (e) { b = null; } return { ok: r.ok, body: b }; }); });
+                }
+
+                // One banner names the draft's changes, with Undo, Discard and Publish; the editors redraw when it changes.
+                function drawBanner(box, confirmation) {
+                    adminCall('GET', 'Publish').then(function (r) {
+                        if (!r.ok || !box.isConnected) return;
+                        var draft = r.body;
+                        box.textContent = '';
+                        if (confirmation) {
+                            var done = box.appendChild(el('p', confirmation + ' ', 'em-publish-done'));
+                            var link = done.appendChild(el('button', 'See History', 'raised button-alt em-prog-button em-publish-history'));
+                            link.type = 'button';
+                            link.addEventListener('click', function () { current = 'history'; drawNav(); drawPanel(); });
+                        }
+                        if (!draft.HasDraft) return;
+                        var bar = box.appendChild(el('div', null, 'em-lay-banner em-publish-banner'));
+                        var count = draft.Changes.length;
+                        bar.appendChild(el('span', 'Unpublished: ' + draft.Changes.join(', ') + ' · ', 'em-publish-changes'));
+                        function act(text, className, onClick) {
+                            var b = bar.appendChild(el('button', text, 'raised button-alt em-prog-button ' + className));
+                            b.type = 'button';
+                            b.addEventListener('click', onClick);
+                            return b;
+                        }
+                        if (draft.CanUndo) act('Undo', 'em-publish-undo', function () { adminCall('POST', 'Publish/Undo').then(function () { drawPanel(); }); });
+                        act('Discard', 'em-publish-discard', function () { adminCall('POST', 'Publish/Discard').then(function () { drawPanel(); }); });
+                        act('Publish…', 'em-publish-open', function () {
+                            var summary = box.querySelector('.em-publish-summary') || box.appendChild(el('div', null, 'em-rule em-publish-summary'));
+                            summary.textContent = '';
+                            summary.appendChild(el('h3', 'Publish ' + count + (count === 1 ? ' change' : ' changes')));
+                            var list = summary.appendChild(el('ul'));
+                            draft.Changes.forEach(function (c) { list.appendChild(el('li', c)); });
+                            summary.appendChild(el('p', 'Everyone sees these on Home once you publish.', 'em-muted'));
+                            var go = summary.appendChild(el('button', 'Publish', 'raised button-submit em-prog-button em-publish-go'));
+                            go.type = 'button';
+                            go.addEventListener('click', function () {
+                                adminCall('POST', 'Publish').then(function (p) {
+                                    if (!p.ok) return;
+                                    drawBanner(box, 'Published version ' + p.body.Id + '.');
+                                });
+                            });
+                        });
+                    });
+                }
+
+                document.addEventListener('em-draft-changed', function () {
+                    var box = page.querySelector('.em-publish');
+                    if (box) drawBanner(box);
+                });
+
+                function drawHistory(panel) {
+                    panel.appendChild(el('p', 'Every published version, newest first. Restore makes a version the draft; publish it to bring it back. Events starting and ending are listed too.'));
+                    var box = panel.appendChild(el('div', null, 'em-history'));
+                    var status = box.appendChild(el('p', 'Loading…', 'em-muted'));
+                    adminCall('GET', 'History').then(function (r) {
+                        if (!r.ok) { status.textContent = 'History could not be loaded. Reload the page to try again.'; return; }
+                        status.remove();
+                        var rows = r.body.Versions.map(function (v) { return { at: v.At, version: v }; })
+                            .concat(r.body.Entries.map(function (e) { return { at: e.At, entry: e }; }))
+                            .sort(function (a, b) { return new Date(b.at) - new Date(a.at); });
+                        var list = box.appendChild(el('ol', null, 'em-aud-list'));
+                        rows.forEach(function (row) {
+                            var item = list.appendChild(el('li', null, 'em-aud-row'));
+                            var text = item.appendChild(el('div', null, 'em-aud-text'));
+                            if (row.entry) {
+                                item.setAttribute('data-entry', '');
+                                text.appendChild(el('div', row.entry.Text, 'em-muted'));
+                                text.appendChild(el('div', when(row.at), 'em-aud-kind'));
+                                return;
+                            }
+                            var v = row.version;
+                            item.setAttribute('data-version', v.Id);
+                            text.appendChild(el('div', 'Version ' + v.Id + (v.Id === r.body.Version ? ' · live' : ''), 'em-aud-name'));
+                            text.appendChild(el('div', v.Author + ' · ' + when(v.At), 'em-aud-kind'));
+                            text.appendChild(el('div', v.Summary, 'em-aud-members'));
+                            if (v.Id !== r.body.Version) {
+                                var restore = item.appendChild(el('button', 'Restore', 'raised button-alt em-prog-button em-history-restore'));
+                                restore.type = 'button';
+                                restore.addEventListener('click', function () {
+                                    adminCall('POST', 'History/' + v.Id + '/Restore').then(function (x) {
+                                        var note = panel.querySelector('.em-history-note') || panel.insertBefore(el('p', null, 'em-history-note'), box);
+                                        note.textContent = x.ok ? 'Version ' + v.Id + ' is now the draft. Publish it on Home layout, Programming or Content rules to bring it back.' : 'That version could not be restored.';
+                                    });
+                                });
+                            }
+                        });
                     });
                 }
 

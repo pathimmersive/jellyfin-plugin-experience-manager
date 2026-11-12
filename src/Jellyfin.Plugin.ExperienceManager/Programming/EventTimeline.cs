@@ -33,7 +33,9 @@ public sealed class EventTimeline : IDisposable
     // Timers take at most about 49 days; a boundary further off is reached by waking once a day.
     private static readonly TimeSpan LongestWait = TimeSpan.FromDays(1);
 
-    private readonly EventStore _events;
+    private readonly EventStore? _events;
+    private readonly Publishing.PublishStore? _published;
+    private readonly Func<IReadOnlyList<ProgrammedEvent>> _source;
     private readonly TimeProvider _time;
     private readonly ConcurrentDictionary<int, ActiveEvents> _sets = new();
     private readonly object _timerLock = new();
@@ -42,18 +44,32 @@ public sealed class EventTimeline : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="EventTimeline"/> class.
     /// </summary>
-    /// <param name="events">The events.</param>
-    public EventTimeline(EventStore events)
-        : this(events, TimeProvider.System)
+    /// <param name="published">The published version, whose events Home serves.</param>
+    public EventTimeline(Publishing.PublishStore published)
+        : this(() => published.Live.Events, TimeProvider.System)
     {
+        _published = published;
+        published.Published += OnEventsChanged;
+        For(null);
     }
 
     internal EventTimeline(EventStore events, TimeProvider time)
+        : this(() => events.All, time)
     {
         _events = events;
-        _time = time;
         _events.Changed += OnEventsChanged;
     }
+
+    internal EventTimeline(Func<IReadOnlyList<ProgrammedEvent>> source, TimeProvider time)
+    {
+        _source = source;
+        _time = time;
+    }
+
+    /// <summary>
+    /// Raised when an event starts or ends for the server's time zone: its name, and whether it started.
+    /// </summary>
+    public event Action<ProgrammedEvent, bool, DateTimeOffset>? Boundary;
 
     /// <summary>
     /// Gets the events on for viewers at a UTC offset.
@@ -70,8 +86,10 @@ public sealed class EventTimeline : IDisposable
         }
 
         // The first viewer at an offset, or a boundary the timer has not reached yet.
+        var previous = set;
         set = Compute(key, now);
         _sets[key] = set;
+        Report(key, previous, set, previous?.Until ?? now);
         Arm();
         return set;
     }
@@ -86,7 +104,16 @@ public sealed class EventTimeline : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        _events.Changed -= OnEventsChanged;
+        if (_events is not null)
+        {
+            _events.Changed -= OnEventsChanged;
+        }
+
+        if (_published is not null)
+        {
+            _published.Published -= OnEventsChanged;
+        }
+
         lock (_timerLock)
         {
             _timer?.Dispose();
@@ -117,7 +144,7 @@ public sealed class EventTimeline : IDisposable
     private ActiveEvents Compute(int key, DateTimeOffset now)
     {
         var local = Local(key, now);
-        var published = _events.All.Where(e => e.Published).ToList();
+        var published = _source().Where(e => e.Published).ToList();
         var active = published.Where(e => Schedules.IsActive(e.Schedule, local)).ToList();
         var next = published.Select(e => Schedules.NextBoundary(e.Schedule, local)).OfType<DateTime>().Order().Select(t => (DateTime?)t).FirstOrDefault();
         return new ActiveEvents(active, KeyOf(active), next is { } t ? Utc(key, t) : null);
@@ -150,16 +177,46 @@ public sealed class EventTimeline : IDisposable
         {
             if (set.Until is { } until && now >= until)
             {
-                _sets[key] = Compute(key, now);
+                var next = Compute(key, now);
+                _sets[key] = next;
+                Report(key, set, next, until);
             }
         }
 
         Arm();
     }
 
+    // Events that started or ended at a boundary in the server's time zone, for History and the activity log, with
+    // the boundary's own time rather than when the timer ran.
+    private void Report(int key, ActiveEvents? before, ActiveEvents after, DateTimeOffset now)
+    {
+        if (key != ServerZone || before is null || Boundary is null)
+        {
+            return;
+        }
+
+        var was = before.Events.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var isOn = after.Events.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var started in after.Events.Where(e => !was.Contains(e.Id)))
+        {
+            Boundary(started, true, now);
+        }
+
+        foreach (var ended in before.Events.Where(e => !isOn.Contains(e.Id)))
+        {
+            Boundary(ended, false, now);
+        }
+    }
+
     private void OnEventsChanged(object? sender, EventArgs e)
     {
         _sets.Clear();
         Arm();
+
+        // Serving the published version, the server's time zone is always tracked, so its boundaries reach History.
+        if (_published is not null)
+        {
+            For(null);
+        }
     }
 }

@@ -131,6 +131,11 @@ public sealed class RulesStore
     }
 
     /// <summary>
+    /// Raised after the rules are changed.
+    /// </summary>
+    public event EventHandler? Changed;
+
+    /// <summary>
     /// Gets the rules.
     /// </summary>
     public ContentRules Rules => _snapshot.Rules;
@@ -163,6 +168,8 @@ public sealed class RulesStore
 
             _snapshot = Load();
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private Snapshot Load()

@@ -26,7 +26,8 @@ public sealed record RuleTarget(string Type, bool Feature, IReadOnlyCollection<s
 /// </summary>
 public sealed class RuleFilter
 {
-    private readonly RulesStore _rules;
+    private readonly Func<ContentRules> _rules;
+    private readonly Func<int> _revision;
     private readonly ILocalizationManager _localization;
     private readonly IUserDataManager _userData;
     private readonly TimeProvider _time;
@@ -34,17 +35,23 @@ public sealed class RuleFilter
     /// <summary>
     /// Initializes a new instance of the <see cref="RuleFilter"/> class.
     /// </summary>
-    /// <param name="rules">The rules.</param>
+    /// <param name="rules">The published version, whose rules Home serves.</param>
     /// <param name="localization">Jellyfin's ratings.</param>
     /// <param name="userData">Jellyfin's user data.</param>
-    public RuleFilter(RulesStore rules, ILocalizationManager localization, IUserDataManager userData)
-        : this(rules, localization, userData, TimeProvider.System)
+    public RuleFilter(Publishing.PublishStore rules, ILocalizationManager localization, IUserDataManager userData)
+        : this(() => rules.Live.Rules, () => rules.Version, localization, userData, TimeProvider.System)
     {
     }
 
     internal RuleFilter(RulesStore rules, ILocalizationManager localization, IUserDataManager userData, TimeProvider time)
+        : this(() => rules.Rules, () => rules.Revision, localization, userData, time)
+    {
+    }
+
+    internal RuleFilter(Func<ContentRules> rules, Func<int> revision, ILocalizationManager localization, IUserDataManager userData, TimeProvider time)
     {
         _rules = rules;
+        _revision = revision;
         _localization = localization;
         _userData = userData;
         _time = time;
@@ -53,7 +60,7 @@ public sealed class RuleFilter
     /// <summary>
     /// Gets the rules' revision, which joins the layout version once they are changed.
     /// </summary>
-    public int Revision => _rules.Revision;
+    public int Revision => _revision();
 
     /// <summary>
     /// Applies the rules a section has not opted out of.
@@ -65,7 +72,7 @@ public sealed class RuleFilter
     /// <returns>The items the rules let through, in order.</returns>
     public IReadOnlyList<BaseItem> Apply(RuleTarget target, User user, IReadOnlyList<string> audiences, IReadOnlyList<BaseItem> items)
     {
-        var rules = _rules.Rules;
+        var rules = _rules();
         bool On(string rule, bool enabled) => enabled && !target.OptedOut.Contains(rule, StringComparer.OrdinalIgnoreCase);
         IEnumerable<BaseItem> result = items;
 

@@ -92,6 +92,11 @@ public sealed class PageStore
     }
 
     /// <summary>
+    /// Raised after a page is changed.
+    /// </summary>
+    public event EventHandler? Changed;
+
+    /// <summary>
     /// Gets a stored page.
     /// </summary>
     /// <param name="pageId">The page id, in any case.</param>
@@ -128,6 +133,7 @@ public sealed class PageStore
             Run(connection, transaction, "UPDATE pages SET revision = revision + 1, updated = $updated WHERE id = $page;", ("$page", current.Id), ("$updated", Now()));
             transaction.Commit();
             _pages = Load();
+            Changed?.Invoke(this, EventArgs.Empty);
             return Get(pageId);
         }
     }

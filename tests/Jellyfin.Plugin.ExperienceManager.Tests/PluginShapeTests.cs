@@ -83,6 +83,7 @@ public class PluginShapeTests
         services.AddSingleton(Substitute.For<MediaBrowser.Controller.TV.ITVSeriesManager>());
         services.AddSingleton(Substitute.For<MediaBrowser.Controller.Dto.IDtoService>());
         services.AddSingleton(Substitute.For<MediaBrowser.Model.Globalization.ILocalizationManager>());
+        services.AddSingleton(Substitute.For<MediaBrowser.Model.Activity.IActivityManager>());
         using var data = new TempDatabase();
         var paths = Substitute.For<MediaBrowser.Common.Configuration.IApplicationPaths>();
         paths.DataPath.Returns(Path.GetDirectoryName(Path.GetDirectoryName(data.FilePath)));
