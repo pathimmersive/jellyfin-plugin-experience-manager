@@ -69,7 +69,14 @@ public class AdminPreviewController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<AdminBadgesResponse> GetBadges([FromRoute] string pageId, [FromQuery] string? audience) =>
-        _pages.LayoutVersion(pageId) is null ? NotFound() : new AdminBadgesResponse(_pages.Badges(pageId, audience));
+        _pages.LayoutVersion(pageId) is null ? NotFound() : new AdminBadgesResponse(_pages.Badges(pageId, audience, DraftEventsNow()));
+
+    // The draft's published events on now in the server's time zone: the badges show the draft.
+    private List<ProgrammedEvent> DraftEventsNow()
+    {
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.Local).DateTime;
+        return _events.All.Where(e => e.Published && Schedules.IsActive(e.Schedule, now)).ToList();
+    }
 
     /// <summary>
     /// Previews a page at a local date and time with the published events on then, and the event being edited.

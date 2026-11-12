@@ -241,6 +241,30 @@ public sealed class EventStore
     /// <returns>The events in their new order, or null if refused.</returns>
     public IReadOnlyList<ProgrammedEvent>? Reorder(IReadOnlyList<string>? ids, out string? error)
     {
+        return ReorderEvents(ids, out error);
+    }
+
+    /// <summary>
+    /// Replaces every event with these, in this order, as when a published version is restored.
+    /// </summary>
+    /// <param name="events">The events, highest first, already checked.</param>
+    public void ReplaceAll(IReadOnlyList<ProgrammedEvent> events)
+    {
+        lock (_write)
+        {
+            Write(t =>
+            {
+                Run(t, "DELETE FROM events WHERE page_id = 'home';");
+                for (var i = 0; i < events.Count; i++)
+                {
+                    Upsert(t, events[i], i);
+                }
+            });
+        }
+    }
+
+    private IReadOnlyList<ProgrammedEvent>? ReorderEvents(IReadOnlyList<string>? ids, out string? error)
+    {
         lock (_write)
         {
             var known = _events.Select(e => e.Id).ToList();

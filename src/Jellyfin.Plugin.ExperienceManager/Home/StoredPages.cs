@@ -58,6 +58,7 @@ public sealed class StoredPages : IPages
     private readonly EventTimeline _events;
     private readonly AudienceResolver? _audiences;
     private readonly RuleFilter? _rules;
+    private readonly Publishing.PublishStore? _published;
     private readonly HomeCache _cache;
     private readonly IHomeSources _sources;
     private readonly TimeProvider _time;
@@ -69,15 +70,17 @@ public sealed class StoredPages : IPages
     /// <param name="events">Which of Home's events are on.</param>
     /// <param name="audiences">The user's audiences and their layouts.</param>
     /// <param name="rules">The content rules.</param>
+    /// <param name="published">The published version, which Home serves; previews and badges read the draft.</param>
     /// <param name="cache">The home cache.</param>
     /// <param name="sources">The user's libraries and what they may see.</param>
-    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, HomeCache cache, IHomeSources sources)
-        : this(store, events, cache, sources, TimeProvider.System, audiences, rules)
+    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, Publishing.PublishStore published, HomeCache cache, IHomeSources sources)
+        : this(store, events, cache, sources, TimeProvider.System, audiences, rules, published)
     {
     }
 
-    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null)
+    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null, Publishing.PublishStore? published = null)
     {
+        _published = published;
         _store = store;
         _events = events;
         _audiences = audiences;
@@ -90,25 +93,25 @@ public sealed class StoredPages : IPages
     /// <inheritdoc />
     public string? LayoutVersion(string pageId, int? utcOffset = null, User? user = null)
     {
-        var page = _store.Get(pageId);
+        var page = Live(pageId);
         if (page is null)
         {
             return null;
         }
 
         var audiences = AudiencesOf(user);
-        var layout = LayoutOf(page, audiences);
+        var layout = LayoutOf(page, audiences, live: true);
         var key = ForAudiences(Active(page.Id, utcOffset), audiences).Key;
-        return page.LayoutVersion
+        return (_published is null ? page.LayoutVersion : "p" + _published.ContentKey)
             + (layout.AudienceId is null ? string.Empty : "-g" + layout.AudienceId + "." + layout.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            + (_rules is { Revision: > 1 } ? "-c" + _rules.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty)
+            + (_published is null && _rules is { Revision: > 1 } ? "-c" + _rules.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty)
             + (key.Length == 0 ? string.Empty : "-e" + key);
     }
 
     /// <inheritdoc />
     public IReadOnlyList<PageSection> SectionsFor(string pageId, User user, int? utcOffset = null)
     {
-        var page = _store.Get(pageId);
+        var page = Live(pageId);
         if (page is null)
         {
             return [];
@@ -116,7 +119,7 @@ public sealed class StoredPages : IPages
 
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
         var audiences = AudiencesOf(user);
-        return EventOverlay.Apply(Expand(LayoutOf(page, audiences).Sections, views), ForAudiences(Active(page.Id, utcOffset), audiences).Events)
+        return EventOverlay.Apply(Expand(LayoutOf(page, audiences, live: true).Sections, views), ForAudiences(Active(page.Id, utcOffset), audiences).Events)
             .Select(slot => Build(slot, views))
             .OfType<PageSection>()
             .ToList();
@@ -161,8 +164,9 @@ public sealed class StoredPages : IPages
     /// </summary>
     /// <param name="pageId">The page id.</param>
     /// <param name="audience">The audience whose layout it is, or null for Everyone's.</param>
+    /// <param name="active">The events on now; the published ones when left out.</param>
     /// <returns>The badges, or none if there is no such page.</returns>
-    public IReadOnlyList<SectionBadge> Badges(string pageId, string? audience)
+    public IReadOnlyList<SectionBadge> Badges(string pageId, string? audience, IReadOnlyList<ProgrammedEvent>? active = null)
     {
         var page = _store.Get(pageId);
         if (page is null)
@@ -173,7 +177,7 @@ public sealed class StoredPages : IPages
         IReadOnlyList<string> audiences = audience is null || audience == EventAudiences.Everyone ? [] : [audience];
         var layout = LayoutOf(page, audiences);
         var gone = new List<HiddenSection>();
-        var slots = EventOverlay.Apply(layout.Sections.Where(s => !s.Off).ToList(), ForAudiences(Active(page.Id, null), audiences).Events, gone);
+        var slots = EventOverlay.Apply(layout.Sections.Where(s => !s.Off).ToList(), ForAudiences(active is null ? Active(page.Id, null) : new ActiveEvents(active, string.Empty, null), audiences).Events, gone);
         var badges = slots
             .Where(s => s.Event is not null)
             .Select(s => new SectionBadge(s.Section.Id, "event", (s.Change == ChangeKinds.Insert ? "Added by " : "Changed by ") + s.Event, s.Section.Title))
@@ -224,8 +228,13 @@ public sealed class StoredPages : IPages
 
     private IReadOnlyList<string> AudiencesOf(User? user) => user is null || _audiences is null ? [] : _audiences.AudiencesOf(user);
 
-    private ResolvedLayout LayoutOf(StoredPage page, IReadOnlyList<string> audiences) =>
-        _audiences is null ? new ResolvedLayout(null, 0, page.Sections) : _audiences.LayoutFor(page, audiences);
+    private ResolvedLayout LayoutOf(StoredPage page, IReadOnlyList<string> audiences, bool live = false) =>
+        _audiences is null
+            ? new ResolvedLayout(null, 0, page.Sections)
+            : _audiences.LayoutFor(page, audiences, live && _published is not null ? _published.LiveLayout : null);
+
+    // What Home serves: the published version once publishing is on, else the stored page.
+    private StoredPage? Live(string pageId) => _published is null ? _store.Get(pageId) : _published.LivePage(pageId);
 
     // Each library's Latest keeps the instance's opt-outs from the content rules.
     private static JsonObject LibraryConfig(Guid library, JsonObject? instance)

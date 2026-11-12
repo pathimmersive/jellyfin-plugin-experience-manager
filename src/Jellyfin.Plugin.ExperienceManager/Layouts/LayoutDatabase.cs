@@ -52,6 +52,7 @@ public sealed class LayoutDatabase
         Audiences.AudienceStore.Migration,
         SectionMigrations.Off,
         Rules.RulesStore.Migration,
+        Publishing.PublishStore.Migration,
     ];
 
     private readonly string _connectionString;

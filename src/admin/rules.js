@@ -73,6 +73,7 @@
                 return r.text().then(function (text) {
                     var parsed = null;
                     try { parsed = text ? JSON.parse(text) : null; } catch (e) { parsed = null; }
+                    if (r.ok && method !== 'GET') document.dispatchEvent(new CustomEvent('em-draft-changed'));
                     return { ok: r.ok, status: r.status, body: parsed };
                 });
             });
