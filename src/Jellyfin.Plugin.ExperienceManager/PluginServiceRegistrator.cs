@@ -51,6 +51,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<StoredPages>();
         serviceCollection.AddSingleton<IPages>(services => services.GetRequiredService<StoredPages>());
         serviceCollection.AddSingleton<HomePageService>();
+        serviceCollection.AddSingleton<Health.SectionTimings>();
+        serviceCollection.AddSingleton<Health.HealthChecks>();
+        serviceCollection.AddSingleton<IScheduledTask, Health.HealthTask>();
         serviceCollection.AddSingleton<IScheduledTask, WarmHomeCacheTask>();
 
         serviceCollection.AddSingleton<ExperienceResolver>();

@@ -98,7 +98,7 @@ public sealed class LayoutEditorTests : IDisposable
         Assert.Contains(new SectionBadge("picks", "source-missing", "Source missing"), badges);
         Assert.DoesNotContain(badges, b => b.Id == "nextup");
 
-        _library.GetItemById(Box).Returns(new Folder { Id = Box });
+        _library.GetItemById(Box).Returns(new Folder { Id = Box, ParentId = Guid.NewGuid() });
         Assert.DoesNotContain(Pages().Badges(PageIds.Home, null), b => b.Kind == "source-missing");
     }
 

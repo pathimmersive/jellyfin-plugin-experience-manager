@@ -134,6 +134,16 @@
             #experienceManagerPage .em-pv-announce-body p, #experienceManagerPage .em-pv-announce-body ul { margin: .2em 0 .4em; padding-left: 1.1em; }
             #experienceManagerPage .em-pv-announce-body p { padding-left: 0; }
             #experienceManagerPage .em-pv-announce-button { display: inline-block; margin-right: .4em; padding: .2em .7em; border-radius: .3em; background: rgba(255, 255, 255, .18); }
+            #experienceManagerPage .em-health { background: rgba(255, 152, 0, .22); }
+            #experienceManagerPage .em-prog-bar-health { box-shadow: inset 0 0 0 2px #ff9800; }
+            #experienceManagerPage .em-prog-health { color: #ffb74d; }
+            #experienceManagerPage .em-hl-group { margin: 1.4em 0 .4em; font-size: 1.05em; }
+            #experienceManagerPage .em-hl-list { list-style: none; padding: 0; margin: 0; }
+            #experienceManagerPage .em-hl-finding { display: flex; flex-wrap: wrap; gap: .3em 1em; align-items: center; justify-content: space-between; padding: .6em .8em; margin: 0 0 .4em; border-radius: .3em; background: rgba(128, 128, 128, .12); }
+            #experienceManagerPage .em-hl-text { min-width: 0; overflow-wrap: anywhere; }
+            #experienceManagerPage .em-hl-speeds { border-collapse: collapse; }
+            #experienceManagerPage .em-hl-speeds { max-width: 100%; }
+            #experienceManagerPage .em-hl-speeds td, #experienceManagerPage .em-hl-speeds th { padding: .3em 1em .3em 0; text-align: left; overflow-wrap: anywhere; }
             #experienceManagerPage .em-lay-readonly { padding: .6em .8em; border-radius: .3em; background: rgba(0, 164, 220, .15); margin: 0 0 1em; }
             @media (max-width: 600px) {
                 #experienceManagerPage .em-ctx-sheet { display: none; }
@@ -162,7 +172,7 @@
                     { title: 'People', pages: [{ id: 'audiences', title: 'Audiences', built: true }, { id: 'defaults', title: 'Group defaults' }] },
                     { title: 'Rules', pages: [{ id: 'rules', title: 'Content rules', built: true }, { id: 'integrations', title: 'Integrations' }] },
                     { title: 'Reach', pages: [{ id: 'clients', title: 'Native clients', built: true }] },
-                    { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance' }, { id: 'history', title: 'History', built: true }, { id: 'backup', title: 'Backup' }] }
+                    { title: 'Operate', pages: [{ id: 'health', title: 'Health and performance', built: true }, { id: 'history', title: 'History', built: true }, { id: 'backup', title: 'Backup' }] }
                 ];
                 var current = 'clients';
 
@@ -231,6 +241,10 @@
                     if (drafted.indexOf(current) >= 0) drawBanner(panel.appendChild(el('div', null, 'em-publish')));
                     if (current === 'history') {
                         drawHistory(panel);
+                        return;
+                    }
+                    if (current === 'health') {
+                        drawScript(panel, 'admin-health.js', 'ExperienceManagerHealth', ['admin-programming.js', 'admin-context.js']);
                         return;
                     }
                     if (current === 'programming') {

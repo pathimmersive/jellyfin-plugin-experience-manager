@@ -34,6 +34,7 @@
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\layout.js" LogicalName="admin-layout.js" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\rules.js" LogicalName="admin-rules.js" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\context.js" LogicalName="admin-context.js" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\admin\health.js" LogicalName="admin-health.js" />
   </ItemGroup>
 
   <!-- The plugin image: Dashboard → Plugins shows it from the plugin folder (meta.json's imagePath), and the

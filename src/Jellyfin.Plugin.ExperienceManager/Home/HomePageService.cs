@@ -44,6 +44,7 @@ public sealed partial class HomePageService
     private readonly IPages _pages;
     private readonly IDtoService _dto;
     private readonly ILogger<HomePageService> _logger;
+    private readonly Health.SectionTimings? _timings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HomePageService"/> class.
@@ -51,7 +52,14 @@ public sealed partial class HomePageService
     /// <param name="pages">The pages.</param>
     /// <param name="dto">Jellyfin's DTO service.</param>
     /// <param name="logger">The logger.</param>
-    public HomePageService(IPages pages, IDtoService dto, ILogger<HomePageService> logger)
+    /// <param name="timings">Where each section's load time is recorded, for Slow.</param>
+    public HomePageService(IPages pages, IDtoService dto, ILogger<HomePageService> logger, Health.SectionTimings timings)
+        : this(pages, dto, logger)
+    {
+        _timings = timings;
+    }
+
+    internal HomePageService(IPages pages, IDtoService dto, ILogger<HomePageService> logger)
     {
         _pages = pages;
         _dto = dto;
@@ -105,6 +113,7 @@ public sealed partial class HomePageService
                 }
 
                 measured[i] = new SectionTiming(section.Id, hit, watch.Elapsed.TotalMilliseconds);
+                _timings?.Record(section.Id, watch.Elapsed.TotalMilliseconds);
             }
 
             built[i] = section.Announcement is { } announcement
@@ -150,6 +159,7 @@ public sealed partial class HomePageService
         var (all, hit) = section.Load(user);
         var items = Page(section, all, startIndex, limit, shape, user);
         timing = new SectionTiming(section.Id, hit, watch.Elapsed.TotalMilliseconds);
+        _timings?.Record(section.Id, watch.Elapsed.TotalMilliseconds);
         return items;
     }
 

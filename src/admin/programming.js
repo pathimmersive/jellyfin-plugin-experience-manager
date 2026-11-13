@@ -308,8 +308,10 @@
             call('GET', 'Library/VirtualFolders'),
             call('GET', 'Items/Filters2?Recursive=true&UserId=' + userId),
             call('GET', 'Items?Recursive=true&IncludeItemTypes=BoxSet&SortBy=SortName&UserId=' + userId),
-            call('GET', BASE + 'Audiences')
+            call('GET', BASE + 'Audiences'),
+            call('GET', BASE + 'Health')
         ]).then(function (r) {
+            state.health = r[6].ok ? r[6].body.Findings : [];
             if (!r[0].ok || !r[1].ok) throw new Error('events');
             state.events = r[0].body.Events;
             state.conflicts = r[0].body.Conflicts;
@@ -403,12 +405,19 @@
         });
     }
 
+    // What the health checks found for an event, in one line, or ''.
+    function healthLine(e) {
+        return (state.health || []).filter(function (f) { return f.EventId === e.Id; }).map(function (f) { return f.Text; }).join(' · ');
+    }
+
     function bar(e, span, year) {
-        var node = el('div', e.Name, 'em-prog-bar' + (e.Published ? ' em-published' : ' em-draft') + (span.weekly ? ' em-weekly' : ''));
+        var health = healthLine(e);
+        var node = el('div', e.Name, 'em-prog-bar' + (e.Published ? ' em-published' : ' em-draft') + (span.weekly ? ' em-weekly' : '') + (health ? ' em-prog-bar-health' : ''));
+        if (health) node.setAttribute('data-health', health);
         var days = daysInYear(year);
         node.style.left = (span.start / days * 100) + '%';
         node.style.width = Math.max((span.end - span.start + 1) / days * 100, 0.6) + '%';
-        node.title = e.Name + (e.Published ? '' : ' (draft)') + ': ' + describeSchedule(e.Schedule);
+        node.title = e.Name + (e.Published ? '' : ' (draft)') + ': ' + describeSchedule(e.Schedule) + (health ? '. ' + health : '');
         node.setAttribute('data-event', e.Id);
         node.addEventListener('click', function () { edit(e); });
         return node;
@@ -500,6 +509,7 @@
             var text = row.appendChild(el('div', null, 'em-prog-row-text'));
             text.appendChild(el('div', e.Name + (e.Published ? '' : ' · draft'), 'em-prog-row-name'));
             text.appendChild(el('div', describeSchedule(e.Schedule) + audienceText(e), 'em-muted em-prog-row-when'));
+            if (healthLine(e)) text.appendChild(el('div', healthLine(e), 'em-prog-health'));
             var label = row.appendChild(el('label', null, 'em-prog-switch'));
             var box = label.appendChild(el('input'));
             box.type = 'checkbox';
@@ -816,6 +826,7 @@
         var form = root.appendChild(el('form', null, 'em-prog-editor'));
         form.addEventListener('submit', function (x) { x.preventDefault(); });
         form.appendChild(el('h3', state.editingNew ? 'New event' : 'Edit ' + ev.Name));
+        if (!state.editingNew && healthLine(ev)) form.appendChild(el('p', healthLine(ev), 'em-prog-health em-prog-health-line')).setAttribute('role', 'status');
         field(form, 'Name', input('text', 'name', ev.Name)).addEventListener('input', function (x) { ev.Name = x.target.value; });
         drawSchedule(form, ev);
         var audiences = [{ value: 'everyone', text: 'Everyone' }].concat(state.audiences.map(function (a) { return { value: a.Id, text: a.Name }; }));
@@ -900,6 +911,11 @@
             load().then(function () {
                 status.remove();
                 barDate();
+                // Opened from a Health finding: open its event.
+                var focus = null;
+                try { focus = JSON.parse(sessionStorage.getItem('em-focus') || 'null'); sessionStorage.removeItem('em-focus'); } catch (e) { focus = null; }
+                var found = focus && focus.event && state.events.filter(function (e) { return e.Id === focus.event; })[0];
+                if (found) { edit(found); return; }
                 draw();
             }, function () {
                 status.textContent = 'The events could not be loaded. Reload the page to try again.';
