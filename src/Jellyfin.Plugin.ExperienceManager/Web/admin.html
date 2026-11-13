@@ -23,7 +23,7 @@
             #experienceManagerPage .em-prog-toolbar { display: flex; flex-wrap: wrap; gap: .5em; align-items: center; margin: 1em 0; }
             #experienceManagerPage .em-prog-button { margin: 0; }
             #experienceManagerPage .em-prog-view[aria-pressed="true"] { font-weight: 600; outline: 2px solid currentColor; }
-            #experienceManagerPage .em-prog-label { min-width: 8em; text-align: center; font-weight: 600; }
+            #experienceManagerPage .em-prog-label, #experienceManagerPage .em-ctx-month-label { min-width: 8em; text-align: center; font-weight: 600; }
             #experienceManagerPage .em-prog-message, #experienceManagerPage .em-prog-error { color: #ff8a65; }
             #experienceManagerPage .em-prog-templates { margin: 0 0 1.5em; display: flex; flex-wrap: wrap; gap: .5em; align-items: center; }
             #experienceManagerPage .em-prog-templates h3 { width: 100%; margin: 0; font-size: 1em; }
@@ -99,6 +99,36 @@
             #experienceManagerPage .em-rule-optouts { font-size: .85em; opacity: .75; }
             #experienceManagerPage .em-rule input[type="number"] { width: 5em; }
             #experienceManagerPage .em-lay-rules { display: flex; flex-wrap: wrap; gap: .3em 1.2em; }
+            #experienceManagerPage .em-ctx { margin: 0 0 1em; padding: .6em .8em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; }
+            #experienceManagerPage .em-ctx-chip { font-weight: 600; margin: 0 0 .4em; }
+            #experienceManagerPage .em-ctx-sheet { display: flex; flex-wrap: wrap; gap: .6em 1.2em; align-items: flex-start; }
+            #experienceManagerPage .em-ctx-control { display: inline-flex; gap: .4em; align-items: center; }
+            #experienceManagerPage .em-ctx-month-head { display: flex; gap: .4em; align-items: center; }
+            #experienceManagerPage .em-ctx-days { display: grid; grid-template-columns: repeat(7, 2.2em); gap: .15em; margin-top: .3em; }
+            #experienceManagerPage .em-ctx-day { padding: .2em 0; text-align: center; background: none; border: 1px solid transparent; color: inherit; border-radius: .3em; cursor: pointer; }
+            #experienceManagerPage .em-ctx-day[aria-pressed="true"] { border-color: #00a4dc; font-weight: 600; }
+            #experienceManagerPage .em-ctx-has-event { box-shadow: inset 0 -3px 0 #00a4dc; }
+            #experienceManagerPage .em-preview-wrap { display: flex; flex-wrap: wrap; gap: 1.2em; align-items: flex-start; margin: 2em 0; }
+            #experienceManagerPage .em-frame { box-sizing: border-box; border: 6px solid #2a2a2a; border-radius: 10px; background: #101010; color: #eee; padding: .6em; overflow: hidden; max-width: 100%; }
+            #experienceManagerPage .em-frame-tv { width: 960px; aspect-ratio: 16 / 9; overflow-y: auto; }
+            #experienceManagerPage .em-frame-web { width: 100%; max-width: 1200px; }
+            #experienceManagerPage .em-frame-phone { width: 390px; border-radius: 26px; }
+            #experienceManagerPage .em-pv-banner { position: relative; height: 13em; border-radius: .4em; background: #222 center / cover no-repeat; display: flex; align-items: flex-end; padding: .6em; box-sizing: border-box; margin: 0 0 .8em; }
+            #experienceManagerPage .em-frame-phone .em-pv-banner { height: 9em; }
+            #experienceManagerPage .em-pv-banner span { background: rgba(0, 0, 0, .55); padding: .2em .5em; border-radius: .2em; font-weight: 600; }
+            #experienceManagerPage .em-pv-row h4 { margin: .5em 0 .3em; font-size: .9em; }
+            #experienceManagerPage .em-pv-cards { display: flex; gap: .4em; overflow: hidden; }
+            #experienceManagerPage .em-pv-card { flex: 0 0 5.5em; aspect-ratio: 2 / 3; border-radius: .25em; background: #333 center / cover no-repeat; font-size: .65em; display: flex; align-items: flex-end; padding: .2em; box-sizing: border-box; overflow: hidden; }
+            #experienceManagerPage .em-frame-phone .em-pv-card { flex-basis: 4.2em; }
+            #experienceManagerPage .em-why { flex: 1 1 18em; min-width: 0; padding: .8em 1em; border: 1px solid rgba(128, 128, 128, .35); border-radius: .4em; }
+            #experienceManagerPage .em-why h3 { margin: 0 0 .4em; font-size: 1em; }
+            #experienceManagerPage .em-why li { margin: .2em 0; }
+            #experienceManagerPage .em-lay-readonly { padding: .6em .8em; border-radius: .3em; background: rgba(0, 164, 220, .15); margin: 0 0 1em; }
+            @media (max-width: 600px) {
+                #experienceManagerPage .em-ctx-sheet { display: none; }
+                #experienceManagerPage .em-context[data-open="true"] .em-ctx-sheet { display: flex; }
+                #experienceManagerPage .em-frame-tv { width: 100%; }
+            }
             @media (max-width: 600px) {
                 #experienceManagerPage .em-nav { gap: .8em; }
                 #experienceManagerPage .em-prog-field > span { flex-basis: 100%; }
@@ -181,17 +211,23 @@
                         panel.appendChild(el('p', 'Coming later.', 'em-muted'));
                         return;
                     }
+                    if (current === 'layout' || current === 'programming') {
+                        var bar = panel.appendChild(el('div', null, 'em-context'));
+                        loadScripts(['admin-programming.js', 'admin-context.js'], function () {
+                            if (bar.isConnected) window.ExperienceManagerContext.drawBar(bar);
+                        });
+                    }
                     if (drafted.indexOf(current) >= 0) drawBanner(panel.appendChild(el('div', null, 'em-publish')));
                     if (current === 'history') {
                         drawHistory(panel);
                         return;
                     }
                     if (current === 'programming') {
-                        drawScript(panel, 'admin-programming.js', 'ExperienceManagerProgramming');
+                        drawScript(panel, 'admin-programming.js', 'ExperienceManagerProgramming', ['admin-context.js']);
                         return;
                     }
                     if (current === 'layout') {
-                        drawScript(panel, 'admin-layout.js', 'ExperienceManagerLayout');
+                        drawScript(panel, 'admin-layout.js', 'ExperienceManagerLayout', ['admin-programming.js', 'admin-context.js']);
                         return;
                     }
                     if (current === 'rules') {
@@ -308,22 +344,29 @@
                     });
                 }
 
-                // Programming and Audiences are scripts of their own, each loaded the first time its page opens.
-                function drawScript(panel, file, name) {
-                    var opened = current;
-                    if (window[name]) {
-                        window[name].draw(panel);
-                        return;
-                    }
-                    var status = panel.appendChild(el('p', 'Loading…', 'em-muted'));
+                // The pages and the context bar are scripts of their own, each loaded once, in order.
+                var loaded = {};
+                function loadScripts(files, done, failed) {
+                    if (!files.length) { done(); return; }
+                    var file = files[0];
+                    var rest = function () { loadScripts(files.slice(1), done, failed); };
+                    if (loaded[file] === true) { rest(); return; }
+                    if (loaded[file]) { loaded[file].push(rest); return; }
+                    loaded[file] = [rest];
                     var script = document.createElement('script');
                     script.src = ApiClient.getUrl('ExperienceManager/' + file);
-                    script.onload = function () {
+                    script.onload = function () { var waiting = loaded[file]; loaded[file] = true; waiting.forEach(function (w) { w(); }); };
+                    script.onerror = function () { delete loaded[file]; if (failed) failed(); };
+                    document.head.appendChild(script);
+                }
+
+                function drawScript(panel, file, name, needs) {
+                    var opened = current;
+                    var status = panel.appendChild(el('p', 'Loading…', 'em-muted'));
+                    loadScripts((needs || []).concat([file]), function () {
                         status.remove();
                         if (current === opened) window[name].draw(panel);
-                    };
-                    script.onerror = function () { status.textContent = 'This page could not be loaded. Reload the page to try again.'; };
-                    document.head.appendChild(script);
+                    }, function () { status.textContent = 'This page could not be loaded. Reload the page to try again.'; });
                 }
 
                 function drawCensus(panel, census) {

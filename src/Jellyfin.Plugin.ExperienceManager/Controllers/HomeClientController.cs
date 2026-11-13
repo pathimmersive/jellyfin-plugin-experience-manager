@@ -87,6 +87,16 @@ public class HomeClientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public ActionResult GetRulesScript() => Serve(_client.RulesScriptETag, _client.OpenRulesScript, HomeClient.ScriptContentType);
 
+    /// <summary>
+    /// Gets the admin page's context bar script. The routes it calls are for administrators only.
+    /// </summary>
+    /// <returns>The script, or 304 when the client already has it.</returns>
+    [HttpGet(HomeClient.ContextScriptFileName)]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public ActionResult GetContextScript() => Serve(_client.ContextScriptETag, _client.OpenContextScript, HomeClient.ScriptContentType);
+
     private ActionResult Serve(string etag, Func<Stream> open, string contentType)
     {
         Response.Headers.CacheControl = "no-cache";
