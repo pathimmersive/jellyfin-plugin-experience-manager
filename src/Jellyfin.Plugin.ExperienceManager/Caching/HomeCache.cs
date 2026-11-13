@@ -138,14 +138,18 @@ public sealed class HomeCache : IDisposable
     /// </summary>
     /// <param name="id">The item.</param>
     /// <returns>The item, or null if there is no such item.</returns>
-    public BaseItem? Item(Guid id) => _library.GetItemById(id);
+    public BaseItem? Item(Guid id) => _library.GetItemById(id) is { } item && !Orphaned(item) ? item : null;
 
     /// <summary>
     /// Gets a value indicating whether an item, such as a library or collection, still exists.
     /// </summary>
     /// <param name="id">The item.</param>
     /// <returns>Whether it exists.</returns>
-    public bool Exists(Guid id) => _library.GetItemById(id) is not null;
+    public bool Exists(Guid id) => Item(id) is not null;
+
+    // A deleted collection whose folder is still on disk is found again by its id, but outside every library: no
+    // parent. Everything in a library has one, libraries included.
+    private static bool Orphaned(BaseItem item) => item.ParentId.Equals(Guid.Empty);
 
     /// <summary>
     /// Leaves out the items a user has watched: those marked played for them.

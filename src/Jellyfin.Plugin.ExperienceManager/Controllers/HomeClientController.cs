@@ -97,6 +97,16 @@ public class HomeClientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     public ActionResult GetContextScript() => Serve(_client.ContextScriptETag, _client.OpenContextScript, HomeClient.ScriptContentType);
 
+    /// <summary>
+    /// Gets the admin page's Health and performance script. The routes it calls are for administrators only.
+    /// </summary>
+    /// <returns>The script, or 304 when the client already has it.</returns>
+    [HttpGet(HomeClient.HealthScriptFileName)]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status304NotModified)]
+    public ActionResult GetHealthScript() => Serve(_client.HealthScriptETag, _client.OpenHealthScript, HomeClient.ScriptContentType);
+
     private ActionResult Serve(string etag, Func<Stream> open, string contentType)
     {
         Response.Headers.CacheControl = "no-cache";

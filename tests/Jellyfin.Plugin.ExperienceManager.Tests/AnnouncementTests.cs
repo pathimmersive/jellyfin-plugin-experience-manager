@@ -45,7 +45,7 @@ public sealed class AnnouncementTests : IDisposable
     private readonly ILibraryManager _library = Substitute.For<ILibraryManager>();
     private readonly IHomeSources _sources = Substitute.For<IHomeSources>();
     private readonly IUserManager _users = Substitute.For<IUserManager>();
-    private readonly BoxSet _party = new() { Id = Guid.NewGuid(), Name = "Party" };
+    private readonly BoxSet _party = new() { Id = Guid.NewGuid(), Name = "Party", ParentId = Guid.NewGuid() };
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "em-images-" + Guid.NewGuid().ToString("N"));
 
     public AnnouncementTests()

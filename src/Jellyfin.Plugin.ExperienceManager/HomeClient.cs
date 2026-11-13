@@ -69,6 +69,13 @@ public class HomeClient
 
     private static readonly Lazy<string> _contextScriptETag = new(() => ComputeETag(ContextScriptFileName));
 
+    /// <summary>
+    /// The admin page's Health and performance script, served beside the home client.
+    /// </summary>
+    public const string HealthScriptFileName = "admin-health.js";
+
+    private static readonly Lazy<string> _healthScriptETag = new(() => ComputeETag(HealthScriptFileName));
+
     private static readonly Lazy<string> _scriptETag = new(() => ComputeETag(ScriptFileName));
 
     private static readonly Lazy<string> _styleETag = new(() => ComputeETag(StyleFileName));
@@ -148,6 +155,17 @@ public class HomeClient
     /// </summary>
     /// <returns>The script.</returns>
     public Stream OpenContextScript() => OpenResource(ContextScriptFileName);
+
+    /// <summary>
+    /// Gets the admin Health and performance script's entity tag, from its content.
+    /// </summary>
+    public string HealthScriptETag => _healthScriptETag.Value;
+
+    /// <summary>
+    /// Opens the admin Health and performance script.
+    /// </summary>
+    /// <returns>The script.</returns>
+    public Stream OpenHealthScript() => OpenResource(HealthScriptFileName);
 
     /// <summary>
     /// Opens the stylesheet.

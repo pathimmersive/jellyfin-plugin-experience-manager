@@ -121,6 +121,19 @@
         return section;
     }
 
+    // The health findings that belong on a row of this layout: Empty for this audience, and Slow anywhere. Latest
+    // for each library's Slow is per library, so it shows on its one row.
+    function healthOf(findings, section, layout) {
+        var id = section.Id.toLowerCase();
+        return (findings || []).filter(function (f) {
+            var target = String(f.SectionId || '').toLowerCase();
+            var here = target === id || (section.Type === 'latest-libraries' && target.indexOf('latest-') === 0);
+            if (!here) return false;
+            if (f.Kind === 'slow') return true;
+            return f.Kind === 'empty-for' && layout !== 'everyone' && String(f.AudienceId || '').toLowerCase() === String(layout).toLowerCase();
+        });
+    }
+
     function hasLatestLibraries(rows) {
         return rows.some(function (r) { return r.section.Type === 'latest-libraries' && r.mark !== 'removed'; });
     }
@@ -159,7 +172,7 @@
 
     var pure = {
         TYPES: TYPES, typeOf: typeOf, titleOf: titleOf, move: move, announce: announce, keyAction: keyAction, entries: entries,
-        makeOwn: makeOwn, useEveryones: useEveryones, remove: remove, newSection: newSection, hasLatestLibraries: hasLatestLibraries,
+        makeOwn: makeOwn, useEveryones: useEveryones, remove: remove, newSection: newSection, hasLatestLibraries: hasLatestLibraries, healthOf: healthOf,
         changes: changes, slug: slug, RULES: RULES, rulesOff: rulesOff
     };
 
@@ -228,7 +241,9 @@
         var everyone = call('GET', ADMIN + 'Pages/home');
         var chosen = group() ? call('GET', ADMIN + 'Audiences/' + encodeURIComponent(state.layout) + '/Pages/home') : everyone;
         var badges = call('GET', ADMIN + 'Pages/home/Badges' + (group() ? '?audience=' + encodeURIComponent(state.layout) : ''));
-        return Promise.all([everyone, chosen, badges]).then(function (r) {
+        var health = call('GET', ADMIN + 'Health');
+        return Promise.all([everyone, chosen, badges, health]).then(function (r) {
+            state.health = r[3].ok ? r[3].body.Findings : [];
             if (!r[0].ok || !r[1].ok) throw new Error('layout');
             state.everyone = r[0].body.Sections.map(sectionOf);
             state.original = group()
@@ -449,6 +464,9 @@
             text.appendChild(el('div', typeOf(s.Type).name + (s.Off ? ' · off' : ''), 'em-lay-type'));
             if (group()) text.appendChild(el('div', MARKS[r.mark] + (r.mark === 'inherited' ? '' : groupName()), 'em-lay-mark'));
             badgesOf(s.Id).forEach(function (b) { text.appendChild(el('span', b.Text, 'em-lay-badge' + (b.Kind === 'source-missing' ? ' em-missing' : ''))); });
+            healthOf(state.health, s, state.layout).forEach(function (f) {
+                text.appendChild(el('span', f.Text, 'em-lay-badge em-health em-health-' + f.Kind)).setAttribute('data-health', f.Kind);
+            });
 
             if (state.readOnly) return;
             if (r.mark !== 'removed') {
@@ -717,7 +735,13 @@
             var status = root.appendChild(el('p', 'Loading…', 'em-muted'));
             loadSources().then(follow).then(function () {
                 status.remove();
-                draw();
+                // Opened from a Health finding: select its section.
+                var focus = null;
+                try { focus = JSON.parse(sessionStorage.getItem('em-focus') || 'null'); sessionStorage.removeItem('em-focus'); } catch (e) { focus = null; }
+                if (focus && focus.section) {
+                    state.rows.forEach(function (r, i) { if (r.section.Id.toLowerCase() === focus.section.toLowerCase()) state.selected = i; });
+                }
+                draw(focus && focus.section);
             }, function () {
                 status.textContent = 'The layout could not be loaded. Reload the page to try again.';
             });

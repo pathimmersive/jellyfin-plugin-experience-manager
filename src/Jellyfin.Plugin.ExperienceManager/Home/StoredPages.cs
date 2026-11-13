@@ -246,20 +246,50 @@ public sealed class StoredPages : IPages
             .ToList();
         foreach (var section in layout.Sections)
         {
-            var config = new SectionConfig(section.Config);
-            var source = section.Type switch
-            {
-                SectionTypes.Latest or SectionTypes.Query => config.Guid("Library"),
-                SectionTypes.Collection => config.Guid("Collection"),
-                _ => null,
-            };
-            if (source is { } id && !_cache.Exists(id))
+            if (SourceIds(section).Any(id => !_cache.Exists(id)))
             {
                 badges.Add(new SectionBadge(section.Id, "source-missing", "Source missing"));
             }
         }
 
         return badges;
+    }
+
+    /// <summary>
+    /// Gets what a section shows or opens from the server: its library, its collection, or its button's target.
+    /// </summary>
+    /// <param name="section">The section.</param>
+    /// <returns>The ids, none for a section that needs nothing on the server.</returns>
+    public static IEnumerable<Guid> SourceIds(StoredSection section)
+    {
+        var config = new SectionConfig(section.Config);
+        var id = section.Type switch
+        {
+            SectionTypes.Latest or SectionTypes.Query => config.Guid("Library"),
+            SectionTypes.Collection => config.Guid("Collection"),
+            SectionTypes.Announcement => config.Guid("ButtonTarget"),
+            _ => null,
+        };
+        return id is { } found ? [found] : [];
+    }
+
+    /// <summary>
+    /// Loads a section's items for a user before the content rules, such as an event's section ahead of its start.
+    /// </summary>
+    /// <param name="section">The section.</param>
+    /// <param name="feature">Whether it is shown as the featured banner.</param>
+    /// <param name="user">The user.</param>
+    /// <returns>The items, or null when the user cannot see its source.</returns>
+    public IReadOnlyList<BaseItem>? RawItems(StoredSection section, bool feature, User user)
+    {
+        var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
+        var raws = new Dictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>(StringComparer.OrdinalIgnoreCase);
+        if (Build(new PageSlot(section, feature), views, raws, user) is null)
+        {
+            return null;
+        }
+
+        return raws.TryGetValue(section.Id, out var raw) ? raw.Load(user).Items : [];
     }
 
     // The content rules run on the items the section loaded, for the viewer's audiences.
