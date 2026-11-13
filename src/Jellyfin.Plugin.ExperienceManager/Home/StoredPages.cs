@@ -76,6 +76,9 @@ public sealed class StoredPages : IPages
     /// <summary>How many cards a row shows before "see all".</summary>
     internal const int RowCount = 16;
 
+    /// <summary>How many a Top 10 shows.</summary>
+    internal const int TopCount = 10;
+
     private readonly PageStore _store;
     private readonly EventTimeline _events;
     private readonly AudienceResolver? _audiences;
@@ -85,6 +88,7 @@ public sealed class StoredPages : IPages
     private readonly IHomeSources _sources;
     private readonly TimeProvider _time;
     private readonly Announcements.DismissalStore? _dismissals;
+    private readonly PlayedRows? _played;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StoredPages"/> class.
@@ -97,14 +101,16 @@ public sealed class StoredPages : IPages
     /// <param name="cache">The home cache.</param>
     /// <param name="sources">The user's libraries and what they may see.</param>
     /// <param name="dismissals">The announcements each user dismissed.</param>
-    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, Publishing.PublishStore published, HomeCache cache, IHomeSources sources, Announcements.DismissalStore dismissals)
-        : this(store, events, cache, sources, TimeProvider.System, audiences, rules, published, dismissals)
+    /// <param name="played">Top 10 and Finish these collections, from what people play.</param>
+    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, Publishing.PublishStore published, HomeCache cache, IHomeSources sources, Announcements.DismissalStore dismissals, PlayedRows played)
+        : this(store, events, cache, sources, TimeProvider.System, audiences, rules, published, dismissals, played)
     {
     }
 
-    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null, Publishing.PublishStore? published = null, Announcements.DismissalStore? dismissals = null)
+    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null, Publishing.PublishStore? published = null, Announcements.DismissalStore? dismissals = null, PlayedRows? played = null)
     {
         _dismissals = dismissals;
+        _played = played;
         _published = published;
         _store = store;
         _events = events;
@@ -418,6 +424,13 @@ public sealed class StoredPages : IPages
                     new SectionSource(SectionSources.Collection, collection.ToString("N")),
                     null,
                     u => Watched(u, config, Visible(u, _cache.Collection(collection, out var hit), hit)));
+            case SectionTypes.TopFilms when _played is not null:
+                return Ranked(Section(stored.Title ?? "Top 10 Films", poster, new SectionSource(SectionSources.Top10, null, "Movie"), null, u => Visible(u, _played.TopFilms(out var hit), hit)));
+            case SectionTypes.TopShows when _played is not null:
+                return Ranked(Section(stored.Title ?? "Top 10 Shows", poster, new SectionSource(SectionSources.Top10, null, "Series"), null, u => Visible(u, _played.TopShows(out var hit), hit)));
+            case SectionTypes.FinishCollections when _played is not null:
+                return Section(stored.Title ?? "Finish These Collections", poster, new SectionSource(SectionSources.Finish), null, u => Visible(u, _played.FinishCollections(u, out var hit), hit))
+                    with { Chips = _played.FinishChips };
             case SectionTypes.Announcement:
                 var content = Announcements.AnnouncementContent.Of(stored);
                 if (dismissals && viewer is not null && content.Dismissible && _dismissals?.IsDismissed(viewer.Id, stored.Id, content.Version) == true)
@@ -429,6 +442,13 @@ public sealed class StoredPages : IPages
             default:
                 return null;
         }
+    }
+
+    // A Top 10: the viewer's first ten, after what they may see and the content rules, numbered.
+    private static PageSection Ranked(PageSection section)
+    {
+        var load = section.Load;
+        return section with { Rank = true, FirstPage = Math.Min(section.FirstPage, TopCount), Load = u => load(u) is var (items, hit) ? (items.Take(TopCount).ToList(), hit) : default };
     }
 
     // What an announcement says to a viewer: its button only when they can open what it opens.

@@ -43,6 +43,12 @@ public static class SectionSources
 
     /// <summary>An Experience Manager section no client knows natively.</summary>
     public const string Section = "section";
+
+    /// <summary>What the most different users played this week, ranked.</summary>
+    public const string Top10 = "top10";
+
+    /// <summary>The collections the user has started and not finished.</summary>
+    public const string Finish = "finish";
 }
 
 /// <summary>
@@ -56,6 +62,8 @@ public static class SectionSources
 /// <param name="FirstPage">How many items the page call inlines.</param>
 /// <param name="Load">Loads every item the user may see, in order, and whether they came from the cache.</param>
 /// <param name="Announcement">For an announcement, what it says to this user; it has no items.</param>
+/// <param name="Rank">Whether the cards show their position, as in a Top 10.</param>
+/// <param name="Chips">A short label for some of the user's items, such as "2 of 3 watched", by item id.</param>
 public sealed record PageSection(
     string Id,
     string Title,
@@ -64,7 +72,9 @@ public sealed record PageSection(
     SeeAllTarget? SeeAll,
     int FirstPage,
     Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load,
-    Announcements.Announcement? Announcement = null);
+    Announcements.Announcement? Announcement = null,
+    bool Rank = false,
+    Func<User, IReadOnlyDictionary<Guid, string>>? Chips = null);
 
 /// <summary>
 /// The pages, each resolved into its sections for a user.

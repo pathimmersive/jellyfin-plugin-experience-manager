@@ -13,7 +13,10 @@
         { type: 'latest', name: 'Latest in one library', about: 'The newest titles in a library you choose.' },
         { type: 'query', name: 'Titles by genre or tag', about: 'Films and shows with the genres or tags you choose.' },
         { type: 'collection', name: 'A collection', about: 'A collection or playlist, in its own order.' },
-        { type: 'announcement', name: 'Announcement', about: 'A message on Home with an optional image and button. A welcome is one in New users\' layout.' }
+        { type: 'announcement', name: 'Announcement', about: 'A message on Home with an optional image and button. A welcome is one in New users\' layout.' },
+        { type: 'top10-films', name: 'Top 10 Films', about: 'The films the most different people played this week, numbered.' },
+        { type: 'top10-shows', name: 'Top 10 Shows', about: 'The shows the most different people watched this week, numbered.' },
+        { type: 'finish-collections', name: 'Finish These Collections', about: 'Collections the viewer started and has not finished, with how many they have watched.' }
     ];
 
     var MARKS = { inherited: 'Inherited', changed: 'Changed in ', added: 'Only in ', removed: 'Removed in ' };

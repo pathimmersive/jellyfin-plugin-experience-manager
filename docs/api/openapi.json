@@ -665,6 +665,14 @@
             ],
             "nullable": true,
             "description": "For an announcement, what it says; null for every other kind."
+          },
+          "Chips": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "A short label to show on some of the section's cards, such as \"2 of 3 watched\", by item id; null when there are none."
           }
         },
         "additionalProperties": false,

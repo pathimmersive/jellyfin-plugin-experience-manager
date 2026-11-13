@@ -135,6 +135,9 @@ public sealed class HealthChecks
         SectionTypes.NextUp => "Next Up",
         SectionTypes.LatestLibraries => "Latest for each library",
         SectionTypes.Announcement => "Announcement",
+        SectionTypes.TopFilms => "Top 10 Films",
+        SectionTypes.TopShows => "Top 10 Shows",
+        SectionTypes.FinishCollections => "Finish These Collections",
         _ => section.Id,
     };
 
@@ -182,7 +185,7 @@ public sealed class HealthChecks
     }
 
     // A member's Home as their audience gets it, on the draft: which sections they would see empty. Continue
-    // Watching and Next Up are personal and often empty, so they are left out.
+    // Watching, Next Up and Finish these collections are personal and often empty, so they are left out.
     private IEnumerable<HealthFinding> EmptyForAudiences()
     {
         var users = _users.GetUsers().ToList();
@@ -200,7 +203,7 @@ public sealed class HealthChecks
             {
                 foreach (var section in _stored.Preview(PageIds.Home, member, [], audience.Id, 1).Sections)
                 {
-                    if (section.Items is null || section.Source is SectionSources.ContinueWatching or SectionSources.NextUp)
+                    if (section.Items is null || section.Source is SectionSources.ContinueWatching or SectionSources.NextUp or SectionSources.Finish)
                     {
                         continue;
                     }

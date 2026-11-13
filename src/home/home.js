@@ -30,19 +30,19 @@
             feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10, room: 18, clear: 12,
             landscape: [296, 166], tile: [296, 166], portrait: [160, 240],
             caption: [34, 62], captionSize: [20, 16], logo: 52, overview: [20, 640], button: [20, 52], message: 64,
-            announce: [150, 222], announceText: [30, 20]
+            announce: [150, 222], announceText: [30, 20], rank: 96
         },
         web: {
             feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6, room: 8, clear: 3,
             landscape: [278, 156], tile: [278, 156], portrait: [150, 225],
             caption: [30, 52], captionSize: [15, 13], logo: 48, overview: [16, 560], button: [15, 42], message: 56,
-            announce: [104, 196], announceText: [22, 15]
+            announce: [104, 196], announceText: [22, 15], rank: 88
         },
         phone: {
             feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4, room: 6, clear: 2,
             landscape: [240, 135], tile: [264, 148], portrait: [118, 177],
             caption: [28, 48], captionSize: [14, 12], logo: 34, overview: [14, 360], button: [15, 44], message: 52,
-            announce: [250, 350], announceText: [21, 14]
+            announce: [250, 350], announceText: [21, 14], rank: 64
         }
     };
 
@@ -59,6 +59,18 @@
     function cardSize(sizes, section) {
         if (section.Id === 'mymedia') return sizes.tile;
         return section.Display.Shape === 'portrait' ? sizes.portrait : sizes.landscape;
+    }
+
+    // A card's width with, in a ranked row, the number column before its poster.
+    function cardWidth(sizes, section) {
+        return cardSize(sizes, section)[0] + (section.Rank ? sizes.rank : 0);
+    }
+
+    // The short label a section puts on an item's card, such as "2 of 3 watched", or null.
+    function chipOf(section, item) {
+        var chips = section.Chips;
+        if (!chips || !item.Id) return null;
+        return chips[String(item.Id).replace(/-/g, '').toLowerCase()] || null;
     }
 
     // Episodes show the series and the episode on two lines; everything else one line.
@@ -256,7 +268,7 @@
     var pure = {
         SIZES: SIZES, MARKS: MARKS, layoutOf: layoutOf, cardSize: cardSize, captionLines: captionLines, rowHeight: rowHeight,
         imageUrl: imageUrl, cardImage: cardImage, blurHashOf: blurHashOf, captionOf: captionOf, metaOf: metaOf, runtime: runtime,
-        detailsHash: detailsHash, libraryHash: libraryHash, announceHeight: announceHeight, buttonHash: buttonHash, overrideHomeSettings: overrideHomeSettings,
+        detailsHash: detailsHash, libraryHash: libraryHash, announceHeight: announceHeight, cardWidth: cardWidth, chipOf: chipOf, buttonHash: buttonHash, overrideHomeSettings: overrideHomeSettings,
         restoreHomeSettings: restoreHomeSettings, isUserSettings: isUserSettings, utcOffset: utcOffset, decodeBlurHash: decodeBlurHash, decode83: decode83
     };
 
@@ -554,15 +566,27 @@
             return box;
         }
 
-        function card(sizes, section, item, serverId, onImage) {
+        // index: the card's place in its row, for a ranked row's number.
+        function card(sizes, section, item, serverId, onImage, index) {
             var size = cardSize(sizes, section);
             var shape = section.Id === 'mymedia' ? 'landscape' : section.Display.Shape;
-            var link = el('a', 'em-card em-focusable focusable');
+            var link = el('a', 'em-card em-focusable focusable' + (section.Rank ? ' em-ranked' : ''));
             link.href = section.Id === 'mymedia' ? libraryHash(item, serverId) : detailsHash(item.Id, serverId);
-            link.style.width = px(size[0]);
+            link.style.width = px(cardWidth(sizes, section));
             link.style.marginRight = px(sizes.gap);
+            if (section.Rank) {
+                // The number sits in its column and runs on under the poster, as the design's "10" does.
+                link.style.paddingLeft = px(sizes.rank);
+                var number = el('span', 'em-rank', String((index || 0) + 1));
+                number.style.fontSize = px(Math.round(size[1] * 0.62));
+                number.style.lineHeight = px(size[1]);
+                number.style.height = px(size[1]);
+                link.appendChild(number);
+            }
             var art = el('div', 'em-card-art');
             art.style.height = px(size[1]);
+            var chip = chipOf(section, item);
+            if (chip) art.appendChild(el('div', 'em-chip', chip)).style.fontSize = px(sizes.captionSize[1]);
             var picked = cardImage(item, shape);
             if (picked) {
                 paintBlurHash(art, blurHashOf(item, picked));
@@ -594,7 +618,7 @@
         function fillRow(row, sizes, section, items, serverId, onFirstImage) {
             var strip = el('div', 'em-strip');
             for (var i = 0; i < items.length; i++) {
-                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null));
+                strip.appendChild(card(sizes, section, items[i], serverId, i === 0 ? onFirstImage : null, i));
             }
             row.appendChild(strip);
         }

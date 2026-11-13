@@ -123,6 +123,21 @@ test('an announcement button opens its item, collection or library inside jellyf
     for (const target of ['item', 'collection', 'library']) assert.match(home.buttonHash({ Target: target, ItemId: 'x', CollectionType: 'tvshows' }, 's'), /^#\//);
 });
 
+test('a ranked row puts the number column before each poster, as wide as the design says per layout', () => {
+    const top = { Id: 'top', Rank: true, Display: { Shape: 'portrait' } };
+    const plain = { Id: 'films', Rank: false, Display: { Shape: 'portrait' } };
+    assert.deepEqual(['tv', 'web', 'phone'].map(l => home.cardWidth(home.SIZES[l], top) - home.cardWidth(home.SIZES[l], plain)), [96, 88, 64]);
+    assert.equal(home.cardWidth(home.SIZES.tv, plain), home.SIZES.tv.portrait[0]);
+});
+
+test('a card shows the chip its section gives it, matched by id however it is written', () => {
+    const section = { Chips: { abcdef0123456789abcdef0123456789: '2 of 3 watched' } };
+    assert.equal(home.chipOf(section, { Id: 'abcdef0123456789abcdef0123456789' }), '2 of 3 watched');
+    assert.equal(home.chipOf(section, { Id: 'ABCDEF01-2345-6789-ABCD-EF0123456789' }), '2 of 3 watched');
+    assert.equal(home.chipOf(section, { Id: 'other' }), null);
+    assert.equal(home.chipOf({}, { Id: 'abcdef0123456789abcdef0123456789' }), null);
+});
+
 test('the client reads the home screen from the public v1 API only', () => {
     const routes = read('src/home/home.js').match(/\/ExperienceManager\/[^'"?]*/g);
     assert.ok(routes.length > 0);
