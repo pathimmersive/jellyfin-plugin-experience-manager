@@ -337,6 +337,100 @@ html.em-booting .splashLogo {
     opacity: 0.7;
 }
 
+/* --- announcements ------------------------------------------------------------------------- */
+
+.em-announce {
+    display: flex;
+    align-items: stretch;
+    box-sizing: border-box;
+    margin-top: 8px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.em-announce-art {
+    position: relative;
+    width: 28%;
+    max-width: 360px;
+    flex: none;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.em-announce-art .em-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* The words at the left and the buttons at the right, so a one-line card stays one line tall. */
+.em-announce-body {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 0 1.4em;
+}
+
+.em-announce-words {
+    min-width: 0;
+    margin-right: 1.4em;
+}
+
+.em-announce-title {
+    margin: 0 0 0.2em;
+    font-weight: 600;
+    /* Room for descenders: the title is cut at its box, as it never wraps. */
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.em-announce-text {
+    margin: 0;
+    padding: 0;
+    opacity: 0.85;
+}
+
+.em-announce-text li {
+    margin: 0.15em 0 0 1.2em;
+}
+
+.em-announce-buttons {
+    display: flex;
+    flex: none;
+    /* Room for a focused button's ring inside the card. */
+    padding: var(--em-ring, 6px);
+    margin: 0 calc(-1 * var(--em-ring, 6px));
+}
+
+/* A phone stacks the image above the text. */
+.em-phone .em-announce {
+    flex-direction: column;
+}
+
+.em-phone .em-announce-body {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.em-phone .em-announce-words {
+    margin: 0 0 0.6em;
+}
+
+.em-phone .em-announce-art {
+    width: 100%;
+    max-width: none;
+    height: 40%;
+}
+
 /* --- focus ----------------------------------------------------------------------------------- */
 
 .em-focusable:focus {

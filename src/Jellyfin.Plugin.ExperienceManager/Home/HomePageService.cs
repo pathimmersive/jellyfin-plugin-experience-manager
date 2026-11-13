@@ -88,7 +88,7 @@ public sealed partial class HomePageService
             var section = sections[i];
             QueryResult<BaseItemDto>? items = null;
             string? error = null;
-            if (i < itemSections)
+            if (i < itemSections && section.Announcement is null)
             {
                 var watch = Stopwatch.StartNew();
                 var hit = false;
@@ -107,12 +107,24 @@ public sealed partial class HomePageService
                 measured[i] = new SectionTiming(section.Id, hit, watch.Elapsed.TotalMilliseconds);
             }
 
-            built[i] = new SectionResponse(section.Id, section.Title, "items", section.Display, false, section.SeeAll, items, error);
+            built[i] = section.Announcement is { } announcement
+                ? new SectionResponse(section.Id, section.Title, "announcement", section.Display, false, null, null, null, announcement)
+                : new SectionResponse(section.Id, section.Title, "items", section.Display, false, section.SeeAll, items, error);
         });
 
         timings = measured.OfType<SectionTiming>().ToList();
         return new PageResponse(pageId.ToLowerInvariant(), layoutVersion, built);
     }
+
+    /// <summary>
+    /// Finds a section on a user's Home as it is served to them now.
+    /// </summary>
+    /// <param name="user">The user.</param>
+    /// <param name="sectionId">The section id.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes, for the events on.</param>
+    /// <returns>The section, or null when the user's Home has no such section.</returns>
+    public PageSection? FindSection(User user, string sectionId, int? utcOffset) =>
+        _pages.SectionsFor(PageIds.Home, user, utcOffset).FirstOrDefault(s => string.Equals(s.Id, sectionId, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Gets a page of one section's items for a user.

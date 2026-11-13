@@ -37,17 +37,25 @@ public sealed class UserCreatedRecorder : IEventConsumer<UserCreatedEventArgs>
 }
 
 /// <summary>
-/// Forgets a deleted account's creation time and memberships.
+/// Forgets a deleted account's creation time, memberships and dismissed announcements.
 /// </summary>
 public sealed class UserDeletedRecorder : IEventConsumer<UserDeletedEventArgs>
 {
     private readonly AudienceStore _audiences;
+    private readonly Announcements.DismissalStore? _dismissals;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UserDeletedRecorder"/> class.
     /// </summary>
     /// <param name="audiences">The audiences.</param>
-    public UserDeletedRecorder(AudienceStore audiences)
+    /// <param name="dismissals">The announcements users dismissed.</param>
+    public UserDeletedRecorder(AudienceStore audiences, Announcements.DismissalStore dismissals)
+        : this(audiences)
+    {
+        _dismissals = dismissals;
+    }
+
+    internal UserDeletedRecorder(AudienceStore audiences)
     {
         _audiences = audiences;
     }
@@ -56,6 +64,7 @@ public sealed class UserDeletedRecorder : IEventConsumer<UserDeletedEventArgs>
     public Task OnEvent(UserDeletedEventArgs eventArgs)
     {
         _audiences.ForgetUser(eventArgs.Argument.Id);
+        _dismissals?.Forget(eventArgs.Argument.Id);
         return Task.CompletedTask;
     }
 }

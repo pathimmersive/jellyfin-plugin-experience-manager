@@ -104,8 +104,23 @@ test('the client sends the viewer\'s UTC offset on every home API call, in minut
     assert.equal(home.utcOffset({ getTimezoneOffset: () => 300 }), -300);
     assert.equal(home.utcOffset({ getTimezoneOffset: () => -60 }), 60);
     const calls = read('src/home/home.js').match(/api\('\/ExperienceManager\/v1\/[^;]*/g);
-    assert.equal(calls.length, 2);
+    // The page, a section's items, and dismissing an announcement.
+    assert.equal(calls.length, 3);
     for (const call of calls) assert.match(call, /utcOffset=' \+ utcOffset\(new Date\(\)\)/, call);
+});
+
+test('an announcement is one line tall, or taller with tips, per layout as the design says', () => {
+    const one = { Lines: ['The server is down on Saturday.'] };
+    const tips = { Lines: ['Press OK to play', 'Hold OK for more'] };
+    assert.deepEqual(['tv', 'web', 'phone'].map(l => [home.announceHeight(home.SIZES[l], one), home.announceHeight(home.SIZES[l], tips)]),
+        [[150, 222], [104, 196], [250, 350]]);
+});
+
+test('an announcement button opens its item, collection or library inside jellyfin-web', () => {
+    assert.equal(home.buttonHash({ Target: 'collection', ItemId: 'c1' }, 's1'), '#/details?id=c1&serverId=s1');
+    assert.equal(home.buttonHash({ Target: 'item', ItemId: 'i1' }, null), '#/details?id=i1');
+    assert.equal(home.buttonHash({ Target: 'library', ItemId: 'l1', CollectionType: 'movies' }, 's1'), '#/movies?topParentId=l1&collectionType=movies&serverId=s1');
+    for (const target of ['item', 'collection', 'library']) assert.match(home.buttonHash({ Target: target, ItemId: 'x', CollectionType: 'tvshows' }, 's'), /^#\//);
 });
 
 test('the client reads the home screen from the public v1 API only', () => {

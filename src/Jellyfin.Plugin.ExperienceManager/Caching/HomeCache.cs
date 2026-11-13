@@ -134,6 +134,13 @@ public sealed class HomeCache : IDisposable
     public string? ItemName(Guid id) => _library.GetItemById(id)?.Name;
 
     /// <summary>
+    /// Gets an item, such as what an announcement's button opens.
+    /// </summary>
+    /// <param name="id">The item.</param>
+    /// <returns>The item, or null if there is no such item.</returns>
+    public BaseItem? Item(Guid id) => _library.GetItemById(id);
+
+    /// <summary>
     /// Gets a value indicating whether an item, such as a library or collection, still exists.
     /// </summary>
     /// <param name="id">The item.</param>

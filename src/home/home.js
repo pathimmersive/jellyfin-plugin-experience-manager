@@ -29,17 +29,20 @@
         tv: {
             feature: 372, pad: 42, titleSize: 30, titleBlock: 48, gap: 16, rowGap: 14, ring: 10, room: 18, clear: 12,
             landscape: [296, 166], tile: [296, 166], portrait: [160, 240],
-            caption: [34, 62], captionSize: [20, 16], logo: 52, overview: [20, 640], button: [20, 52], message: 64
+            caption: [34, 62], captionSize: [20, 16], logo: 52, overview: [20, 640], button: [20, 52], message: 64,
+            announce: [150, 222], announceText: [30, 20]
         },
         web: {
             feature: 460, pad: 42, titleSize: 22, titleBlock: 40, gap: 10, rowGap: 14, ring: 6, room: 8, clear: 3,
             landscape: [278, 156], tile: [278, 156], portrait: [150, 225],
-            caption: [30, 52], captionSize: [15, 13], logo: 48, overview: [16, 560], button: [15, 42], message: 56
+            caption: [30, 52], captionSize: [15, 13], logo: 48, overview: [16, 560], button: [15, 42], message: 56,
+            announce: [104, 196], announceText: [22, 15]
         },
         phone: {
             feature: 380, pad: 13, titleSize: 21, titleBlock: 38, gap: 8, rowGap: 12, ring: 4, room: 6, clear: 2,
             landscape: [240, 135], tile: [264, 148], portrait: [118, 177],
-            caption: [28, 48], captionSize: [14, 12], logo: 34, overview: [14, 360], button: [15, 44], message: 52
+            caption: [28, 48], captionSize: [14, 12], logo: 34, overview: [14, 360], button: [15, 44], message: 52,
+            announce: [250, 350], announceText: [21, 14]
         }
     };
 
@@ -129,6 +132,17 @@
         if (item.CollectionType === 'tvshows') return '#/tv?topParentId=' + item.Id + '&collectionType=tvshows' + server;
         if (item.CollectionType === 'music') return '#/music?topParentId=' + item.Id + '&collectionType=music' + server;
         return '#/list?parentId=' + item.Id + server;
+    }
+
+    // An announcement is one line tall, or taller with a welcome's tips (the design's sizes table).
+    function announceHeight(sizes, announcement) {
+        return sizes.announce[announcement.Lines.length > 1 ? 1 : 0];
+    }
+
+    // Where an announcement's button leads, always inside jellyfin-web.
+    function buttonHash(button, serverId) {
+        if (button.Target === 'library') return libraryHash({ Id: button.ItemId, CollectionType: button.CollectionType }, serverId);
+        return detailsHash(button.ItemId, serverId);
     }
 
     // The home settings jellyfin-web reads, with every home row set to none, and the values they had.
@@ -242,7 +256,7 @@
     var pure = {
         SIZES: SIZES, MARKS: MARKS, layoutOf: layoutOf, cardSize: cardSize, captionLines: captionLines, rowHeight: rowHeight,
         imageUrl: imageUrl, cardImage: cardImage, blurHashOf: blurHashOf, captionOf: captionOf, metaOf: metaOf, runtime: runtime,
-        detailsHash: detailsHash, libraryHash: libraryHash, overrideHomeSettings: overrideHomeSettings,
+        detailsHash: detailsHash, libraryHash: libraryHash, announceHeight: announceHeight, buttonHash: buttonHash, overrideHomeSettings: overrideHomeSettings,
         restoreHomeSettings: restoreHomeSettings, isUserSettings: isUserSettings, utcOffset: utcOffset, decodeBlurHash: decodeBlurHash, decode83: decode83
     };
 
@@ -636,6 +650,64 @@
             }
         }
 
+        // A full-width card: the title, the line or tips, the image, the button and, when allowed, Got it.
+        function announcement(sizes, section, serverId) {
+            var a = section.Announcement;
+            var box = el('section', 'em-announce' + (a.Lines.length > 1 ? ' em-announce-tips' : ''));
+            box.setAttribute('data-section', section.Id);
+            box.style.height = px(announceHeight(sizes, a));
+            box.style.marginLeft = box.style.marginRight = px(sizes.pad);
+            if (a.Image) {
+                var art = el('div', 'em-announce-art');
+                image(art, base + a.Image);
+                box.appendChild(art);
+            }
+            var body = el('div', 'em-announce-body');
+            var words = el('div', 'em-announce-words');
+            body.appendChild(words);
+            if (section.Title) {
+                var title = el('h2', 'em-announce-title', section.Title);
+                title.style.fontSize = px(sizes.announceText[0]);
+                words.appendChild(title);
+            }
+            var tips = a.Lines.length > 1;
+            var text = el(tips ? 'ul' : 'p', 'em-announce-text');
+            text.style.fontSize = px(sizes.announceText[1]);
+            for (var i = 0; i < a.Lines.length; i++) text.appendChild(el(tips ? 'li' : 'span', null, a.Lines[i]));
+            words.appendChild(text);
+            var buttons = el('div', 'em-announce-buttons');
+            var first = null;
+            if (a.Button) {
+                var go = el('button', 'em-button em-primary em-focusable focusable em-announce-go', a.Button.Label);
+                go.addEventListener('click', function () { win.location.hash = buttonHash(a.Button, serverId); });
+                buttons.appendChild(go);
+                first = go;
+            }
+            if (a.Dismissible) {
+                var done = el('button', 'em-button em-focusable focusable em-announce-dismiss', 'Got it');
+                done.addEventListener('click', function () {
+                    api('/ExperienceManager/v1/Sections/' + encodeURIComponent(section.Id) + '/Dismiss?utcOffset=' + utcOffset(new Date()), { method: 'POST' })
+                        .then(null, function () { /* shown again next time */ });
+                    // The next visit asks again rather than redrawing the page it has.
+                    state.page = null;
+                    if (state.root) state.root.emRendered = null;
+                    if (box.parentNode) box.parentNode.removeChild(box);
+                });
+                buttons.appendChild(done);
+                first = first || done;
+            }
+            var all = buttons.childNodes;
+            for (var b = 0; b < all.length; b++) {
+                all[b].type = 'button';
+                all[b].style.fontSize = px(sizes.button[0]);
+                all[b].style.height = px(sizes.button[1]);
+            }
+            if (first) body.appendChild(buttons);
+            box.appendChild(body);
+            box.emFirst = first;
+            return box;
+        }
+
         function feature(sizes, section, serverId, layout) {
             var items = section.Items.Items;
             var box = el('section', 'em-feature');
@@ -841,6 +913,10 @@
             var featureBox = null;
             for (var i = 0; i < sections.length; i++) {
                 var section = sections[i];
+                if (section.Kind === 'announcement' && section.Announcement) {
+                    frame.appendChild(announcement(sizes, section, serverId));
+                    continue;
+                }
                 if (section.Kind !== 'items') continue;
                 if (section.Display.Hint === 'feature') {
                     if (section.Items && section.Items.Items.length) {
@@ -1082,8 +1158,12 @@
             if ((!down && !up) || !from || !from.closest || !state.root || !state.root.parentNode || !homeVisible()) return;
             var feature = state.root.querySelector('.em-feature');
             if (!feature || !feature.emPlay) return;
+            var below = feature.nextElementSibling;
             var into = null;
             if (down && from.closest('.skinHeader')) into = feature.emPlay;
+            // Down from the feature lands on the announcement's button, Up from it goes back.
+            else if (down && from.closest('.em-feature') === feature && below && below.emFirst) into = below.emFirst;
+            else if (up && below && from.closest('.em-announce') === below) into = feature.emLast || feature.emPlay;
             else if (up && from.closest('.em-row') && from.closest('.em-row') === feature.nextElementSibling) into = feature.emLast || feature.emPlay;
             if (!into) return;
             e.preventDefault();

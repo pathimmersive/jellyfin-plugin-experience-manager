@@ -35,6 +35,38 @@
         "security": []
       }
     },
+    "/ExperienceManager/v1/Images/{imageId}": {
+      "get": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "GetImage",
+        "summary": "Gets an image uploaded for an announcement. Images are named by their content, so an address never changes what it serves; no token is needed, as for Jellyfin's own item images.",
+        "parameters": [
+          {
+            "name": "imageId",
+            "in": "path",
+            "description": "The image id, as an announcement's `Image` path ends.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image, or 404."
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "The server is currently starting or is temporarily not available."
+          }
+        },
+        "security": []
+      }
+    },
     "/ExperienceManager/v1/Me/Preferences": {
       "get": {
         "tags": [
@@ -141,6 +173,73 @@
           },
           "304": {
             "description": "Not Modified"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The server is currently starting or is temporarily not available."
+          }
+        },
+        "security": [
+          {
+            "CustomAuthentication": [
+              "DefaultAuthorization"
+            ]
+          }
+        ]
+      }
+    },
+    "/ExperienceManager/v1/Sections/{sectionId}/Dismiss": {
+      "post": {
+        "tags": [
+          "Home API"
+        ],
+        "operationId": "Dismiss",
+        "summary": "Dismisses an announcement on the signed-in user's Home, on every device, until it changes.",
+        "parameters": [
+          {
+            "name": "sectionId",
+            "in": "path",
+            "description": "The announcement's section id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "utcOffset",
+            "in": "query",
+            "description": "The viewer's UTC offset in minutes, as sent for the page, for announcements an event adds.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized",
@@ -306,6 +405,76 @@
   },
   "components": {
     "schemas": {
+      "Announcement": {
+        "type": "object",
+        "properties": {
+          "Lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The text: one line, or up to three tips, one per line."
+          },
+          "Image": {
+            "type": "string",
+            "nullable": true,
+            "description": "The image's path on the server, such as `/ExperienceManager/v1/Images/{imageId}`, or null."
+          },
+          "Button": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementButton"
+              }
+            ],
+            "nullable": true,
+            "description": "The button, or null when there is none or the viewer cannot open what it opens."
+          },
+          "Dismissible": {
+            "type": "boolean",
+            "description": "Whether the viewer may dismiss it, with `POST /ExperienceManager/v1/Sections/{sectionId}/Dismiss`."
+          },
+          "Version": {
+            "type": "string",
+            "description": "Changes when the title, text, image or button change; a dismissal holds until it does."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An announcement on Home: a title, one line of text or up to three tips, an optional image and an optional button that opens something on the server. A client that does not know the `announcement` kind skips it.",
+        "required": [
+          "Lines",
+          "Dismissible",
+          "Version"
+        ]
+      },
+      "AnnouncementButton": {
+        "type": "object",
+        "properties": {
+          "Label": {
+            "type": "string",
+            "description": "The button's text."
+          },
+          "ItemId": {
+            "type": "string",
+            "description": "The item, collection or library it opens."
+          },
+          "Target": {
+            "type": "string",
+            "description": "What it opens: `item`, `collection` or `library`."
+          },
+          "CollectionType": {
+            "type": "string",
+            "nullable": true,
+            "description": "For a library, its Jellyfin collection type, such as `movies`; otherwise null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An announcement's button. It never leads outside the app: it opens an item, a collection or a library.",
+        "required": [
+          "Label",
+          "ItemId",
+          "Target"
+        ]
+      },
       "BaseItemDto": {
         "type": "object",
         "description": "A Jellyfin item, exactly as Jellyfin's own item routes return it. Its schema is Jellyfin's `BaseItemDto`, in the server's own OpenAPI document at `/api-docs/openapi.json`.",
@@ -451,7 +620,7 @@
           },
           "Kind": {
             "type": "string",
-            "description": "The content kind; `items` for every section on the fixed Home page."
+            "description": "The content kind: `items`, or `announcement`, which has no items and carries `Announcement`."
           },
           "Display": {
             "allOf": [
@@ -487,6 +656,15 @@
             "type": "string",
             "nullable": true,
             "description": "Why the items are missing, when the section failed."
+          },
+          "Announcement": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            ],
+            "nullable": true,
+            "description": "For an announcement, what it says; null for every other kind."
           }
         },
         "additionalProperties": false,

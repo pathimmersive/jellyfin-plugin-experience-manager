@@ -12,7 +12,8 @@
         { type: 'latest-libraries', name: 'Latest for each library', about: 'The newest titles, one row for each film and show library.' },
         { type: 'latest', name: 'Latest in one library', about: 'The newest titles in a library you choose.' },
         { type: 'query', name: 'Titles by genre or tag', about: 'Films and shows with the genres or tags you choose.' },
-        { type: 'collection', name: 'A collection', about: 'A collection or playlist, in its own order.' }
+        { type: 'collection', name: 'A collection', about: 'A collection or playlist, in its own order.' },
+        { type: 'announcement', name: 'Announcement', about: 'A message on Home with an optional image and button. A welcome is one in New users\' layout.' }
     ];
 
     var MARKS = { inherited: 'Inherited', changed: 'Changed in ', added: 'Only in ', removed: 'Removed in ' };
@@ -116,6 +117,7 @@
         var base = type === 'query' ? 'genre-row' : type === 'collection' ? 'collection-row' : type === 'latest-libraries' ? 'latest' : type;
         var section = { Id: uniqueId(base, rows), Type: type };
         if (type === 'query') section.Config = { Genres: [], ItemTypes: 'Movie,Series' };
+        if (type === 'announcement') section.Config = { Text: '', Dismissible: true };
         return section;
     }
 
@@ -352,6 +354,10 @@
             frame.textContent = '';
             if (!p) { frame.appendChild(el('p', 'The preview could not be made.', 'em-aud-error')); return; }
             p.Sections.forEach(function (s) {
+                if (s.Announcement) {
+                    drawAnnouncement(frame, s);
+                    return;
+                }
                 var image = function (item, type, height) {
                     return 'url("' + ApiClient.getUrl('Items/' + item.Id + '/Images/' + type, { maxHeight: height, quality: 80 }) + '")';
                 };
@@ -376,6 +382,24 @@
             });
             drawWhy(why, p);
         });
+    }
+
+    // An announcement as Home draws it: its image, title, line or tips, and buttons.
+    function drawAnnouncement(frame, s) {
+        var a = s.Announcement;
+        var card = frame.appendChild(el('div', null, 'em-pv-announce'));
+        card.setAttribute('data-section', s.Id);
+        if (a.Image) {
+            var art = card.appendChild(el('div', null, 'em-pv-announce-art'));
+            art.style.backgroundImage = 'url("' + ApiClient.getUrl(a.Image.replace(/^\//, '')) + '")';
+        }
+        var body = card.appendChild(el('div', null, 'em-pv-announce-body'));
+        if (s.Title) body.appendChild(el('strong', s.Title));
+        var lines = body.appendChild(el(a.Lines.length > 1 ? 'ul' : 'p'));
+        a.Lines.forEach(function (line) { lines.appendChild(el(a.Lines.length > 1 ? 'li' : 'span', line)); });
+        var buttons = body.appendChild(el('div'));
+        if (a.Button) buttons.appendChild(el('span', a.Button.Label, 'em-pv-announce-button'));
+        if (a.Dismissible) buttons.appendChild(el('span', 'Got it', 'em-pv-announce-button'));
     }
 
     function drawWhy(box, p) {
@@ -603,7 +627,11 @@
             hide.checked = !!configValue(s.Config, 'HideWatched');
             hide.addEventListener('change', function () { setConfig(s, 'HideWatched', hide.checked || undefined); edited(row, true); });
         }
-        var follows = panel.appendChild(el('fieldset', null, 'em-lay-rules'));
+        if (s.Type === 'announcement' && window.ExperienceManagerProgramming) {
+            window.ExperienceManagerProgramming.announcementFields(panel, s, { libraries: state.libraries, collections: state.collections }, function (redraw) { edited(row, !redraw); });
+        }
+        // Content rules choose among items; an announcement has none.
+        var follows = s.Type === 'announcement' ? el('fieldset') : panel.appendChild(el('fieldset', null, 'em-lay-rules'));
         follows.appendChild(el('legend', 'Content rules this section follows'));
         RULES.forEach(function (rule) {
             var label = follows.appendChild(el('label'));

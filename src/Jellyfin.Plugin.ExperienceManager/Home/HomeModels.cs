@@ -28,12 +28,13 @@ public sealed record SeeAllTarget(string? ParentId, string IncludeItemTypes, str
 /// </summary>
 /// <param name="Id">The section's stable id.</param>
 /// <param name="Title">The title shown above it.</param>
-/// <param name="Kind">The content kind; <c>items</c> for every section on the fixed Home page.</param>
+/// <param name="Kind">The content kind: <c>items</c>, or <c>announcement</c>, which has no items and carries <see cref="Announcement"/>.</param>
 /// <param name="Display">How to show it.</param>
 /// <param name="Rank">Whether the cards show their position, as in a Top 10.</param>
 /// <param name="SeeAll">Where "see all" leads, or null when there is nowhere to go.</param>
 /// <param name="Items">The first items, when the page call asked for them.</param>
 /// <param name="Error">Why the items are missing, when the section failed.</param>
+/// <param name="Announcement">For an announcement, what it says; null for every other kind.</param>
 public sealed record SectionResponse(
     string Id,
     string Title,
@@ -42,7 +43,8 @@ public sealed record SectionResponse(
     bool Rank,
     SeeAllTarget? SeeAll,
     QueryResult<BaseItemDto>? Items,
-    string? Error);
+    string? Error,
+    Announcements.Announcement? Announcement = null);
 
 /// <summary>
 /// A resolved page: its sections in order.

@@ -20,7 +20,7 @@ The examples below use two shell variables: `SERVER`, the server's address (for 
 
 ```sh
 curl -sf "$SERVER/ExperienceManager/Info"
-# {"Version":"0.1.0.0","ApiVersions":["v1"],"Features":["pages","section-items"]}
+# {"Version":"0.1.0.0","ApiVersions":["v1"],"Features":["pages","section-items","announcements"]}
 ```
 
 Use the API only when `ApiVersions` contains `v1`.
@@ -40,13 +40,14 @@ Each section has:
 |---|---|
 | `Id` | The section's stable id; use it to page its items. |
 | `Title` | The title to show above it. |
-| `Kind` | The content kind. `items` is a row of Jellyfin items. |
+| `Kind` | The content kind. `items` is a row of Jellyfin items; `announcement` is a message from the admin (see Announcements). |
 | `Display.Hint` | `feature` for a large banner, `row` for a row of cards. |
 | `Display.Shape` | The card shape: `portrait`, `landscape` or `square`. |
 | `Rank` | Whether cards show their position, as in a Top 10. |
 | `SeeAll` | Where "see all" leads, as a Jellyfin item query, or absent. |
 | `Items` | The first items, when the page call inlined them. |
 | `Error` | Present when the section's source failed: show a short message or hide the section. |
+| `Announcement` | For an `announcement`, what it says; absent or null for every other kind. |
 
 The page call takes Jellyfin's own item parameters, `fields`, `enableImageTypes`, `imageTypeLimit` and `enableUserData`, and applies them to every inlined section.
 
@@ -74,6 +75,20 @@ The page carries no section types, only how to show each section, so a client ke
 
 The banner is just a section with the `feature` hint, so a client that only draws rows still shows its items.
 
+### Announcements
+
+A section of kind `announcement` has no items. Its `Announcement` carries:
+
+| Field | Meaning |
+|---|---|
+| `Lines` | One line of text, or up to three tips (a welcome for new users). |
+| `Image` | The image's path on the server, such as `/ExperienceManager/v1/Images/{imageId}`, or null. It needs no token. |
+| `Button` | `Label`, `ItemId`, `Target` (`item`, `collection` or `library`) and, for a library, its `CollectionType`; null when there is no button or the user cannot open it. It always opens something on the server, never a web address. |
+| `Dismissible` | Whether the user may dismiss it. |
+| `Version` | Changes when the admin edits it. |
+
+Draw it as a full-width card with the section's `Title`. When it is dismissible, offer to dismiss it and send `POST /ExperienceManager/v1/Sections/{sectionId}/Dismiss` (with `utcOffset`): it stays dismissed for that user on every device until the admin edits it. A 404 means there is nothing to dismiss.
+
 Images come from Jellyfin's own image routes, as for any item: `/Items/{itemId}/Images/{type}?tag={tag}&maxWidth={width}`, with the tags in each item's `ImageTags`, `BackdropImageTags` and `ImageBlurHashes`.
 
 "See all" runs as Jellyfin's own `/Items` query with the target's `ParentId`, `IncludeItemTypes`, `SortBy`, `SortOrder` and `Filters`, plus `Recursive=true`:
@@ -95,7 +110,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: MediaBrowser Token=\
 # 304
 ```
 
-The page's `LayoutVersion` changes whenever the layout or the events on it change, which tells a client that caches pages between sessions when to drop them.
+The page's `LayoutVersion` changes whenever the layout or the events on it change, or the user dismisses an announcement,, which tells a client that caches pages between sessions when to drop them.
 
 ## Versioning
 

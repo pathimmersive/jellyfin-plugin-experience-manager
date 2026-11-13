@@ -41,8 +41,15 @@ public static class SectionTypes
     /// <summary>A collection or playlist's items: config <c>Collection</c>, optionally <c>HideWatched</c>.</summary>
     public const string Collection = "collection";
 
+    /// <summary>
+    /// An announcement: config <c>Text</c> (one line, or up to three tips one per line), optionally <c>Image</c> (an
+    /// uploaded image's id), <c>ButtonLabel</c> with <c>ButtonTarget</c> (an item, collection or library id) and
+    /// <c>Dismissible</c>.
+    /// </summary>
+    public const string Announcement = "announcement";
+
     /// <summary>Every type, in the order the admin API lists them.</summary>
-    public static readonly IReadOnlyList<string> All = [Featured, MyMedia, ContinueWatching, NextUp, LatestLibraries, Latest, Query, Collection];
+    public static readonly IReadOnlyList<string> All = [Featured, MyMedia, ContinueWatching, NextUp, LatestLibraries, Latest, Query, Collection, Announcement];
 
     /// <summary>
     /// Checks a section's config for its type.
@@ -64,6 +71,7 @@ public static class SectionTypes
             Query when config.Text("Library") is not null && config.Guid("Library") is null => $"section {section.Id} has a Library that is not an id",
             Query when config.Text("ItemTypes") is not null && config.ItemTypes() is null => $"section {section.Id} has an unknown item type",
             Collection when config.Guid("Collection") is null => $"section {section.Id} needs a Collection id",
+            Announcement => Announcements.AnnouncementContent.Validate(section),
             _ => null,
         };
     }
