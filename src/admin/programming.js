@@ -189,6 +189,7 @@
             var id = configValue(config, 'Collection');
             return section.Title || names[id] || 'a collection';
         }
+        if (section.Type === 'announcement') return section.Title ? 'the announcement ' + section.Title : 'an announcement';
         return section.Title || names[section.Id] || section.Type;
     }
 
@@ -561,6 +562,117 @@
         return node;
     }
 
+    // ---- An announcement's settings, shared with Home layout ----
+
+    function setKey(config, key, value) {
+        for (var k in config) if (k.toLowerCase() === key.toLowerCase()) delete config[k];
+        if (value !== undefined && value !== '') config[key] = value;
+    }
+
+    function plainId(id) {
+        return String(id || '').replace(/-/g, '').toLowerCase();
+    }
+
+    // The text, an uploaded image, a button to an item, collection or library, and whether it can be dismissed.
+    // changed(redraw) is called after each edit; redraw is true when the form's shape changed.
+    function announcementFields(box, section, sources, changed) {
+        var config = section.Config || (section.Config = {});
+        var text = el('textarea');
+        text.name = 'announce-text';
+        text.rows = 3;
+        text.value = configValue(config, 'Text') || '';
+        field(box, 'Text', text).addEventListener('input', function () { setKey(config, 'Text', text.value); changed(false); });
+        box.appendChild(el('p', 'One line, or up to three tips, one per line. A welcome is an announcement in New users\' layout.', 'em-muted'));
+
+        var imageBox = box.appendChild(el('div', null, 'em-ann-image'));
+        var id = configValue(config, 'Image');
+        if (id) {
+            var thumb = imageBox.appendChild(el('img', null, 'em-ann-thumb'));
+            thumb.alt = '';
+            thumb.src = ApiClient.getUrl('ExperienceManager/v1/Images/' + id);
+            imageBox.appendChild(button('Remove the image', 'em-ann-image-remove', function () { setKey(config, 'Image'); changed(true); }));
+        }
+        var file = field(imageBox, id ? 'Replace the image' : 'Image', input('file', 'announce-image'));
+        file.accept = 'image/png,image/jpeg,image/webp';
+        var status = imageBox.appendChild(el('span', null, 'em-muted em-ann-image-status'));
+        file.addEventListener('change', function () {
+            var picked = file.files && file.files[0];
+            if (!picked) return;
+            status.textContent = 'Uploading…';
+            fetch(ApiClient.getUrl('ExperienceManager/Admin/Images'), {
+                method: 'POST',
+                headers: { Authorization: 'MediaBrowser Token="' + ApiClient.accessToken() + '"', 'Content-Type': picked.type || 'application/octet-stream' },
+                body: picked
+            }).then(function (r) {
+                return r.json().then(function (b) { return { ok: r.ok, body: b }; }, function () { return { ok: r.ok, body: null }; });
+            }).then(function (r) {
+                if (!r.ok) {
+                    status.className = 'em-aud-error em-ann-image-status';
+                    status.textContent = (r.body && r.body.Error) || 'The image could not be uploaded.';
+                    return;
+                }
+                setKey(config, 'Image', r.body.Id);
+                changed(true);
+            }, function () {
+                status.className = 'em-aud-error em-ann-image-status';
+                status.textContent = 'The image could not be uploaded.';
+            });
+        });
+
+        var label = field(box, 'Button', input('text', 'announce-label', configValue(config, 'ButtonLabel') || ''));
+        label.placeholder = 'No button';
+        label.addEventListener('input', function () { setKey(config, 'ButtonLabel', label.value.trim()); changed(false); });
+        var kinds = [{ value: '', text: 'Nothing' }, { value: 'item', text: 'A film or show' }, { value: 'collection', text: 'A collection' }, { value: 'library', text: 'A library' }];
+        var kind = field(box, 'It opens', select('announce-target-kind', kinds, configValue(config, 'ButtonKind') || ''));
+        kind.addEventListener('change', function () {
+            setKey(config, 'ButtonKind', kind.value);
+            var first = kind.value === 'collection' ? sources.collections[0] && sources.collections[0].Id
+                : kind.value === 'library' ? sources.libraries[0] && sources.libraries[0].ItemId : undefined;
+            setKey(config, 'ButtonTarget', first ? plainId(first) : undefined);
+            changed(true);
+        });
+        var target = plainId(configValue(config, 'ButtonTarget'));
+        var pick = function (options) {
+            var node = field(box, 'Opens', select('announce-target', options, target));
+            node.addEventListener('change', function () { setKey(config, 'ButtonTarget', node.value); changed(false); });
+            return node;
+        };
+        if (kind.value === 'collection') {
+            pick(sources.collections.map(function (c) { return { value: plainId(c.Id), text: c.Name }; }));
+        } else if (kind.value === 'library') {
+            pick(sources.libraries.map(function (l) { return { value: plainId(l.ItemId), text: l.Name }; }));
+        } else if (kind.value === 'item') {
+            var search = field(box, 'Find a title', input('search', 'announce-item-search'));
+            var results = pick(target ? [{ value: target, text: 'The chosen title' }] : []);
+            if (target) {
+                call('GET', 'Items?Ids=' + target + '&UserId=' + ApiClient.getCurrentUserId()).then(function (r) {
+                    var found = r.ok && r.body.Items && r.body.Items[0];
+                    if (found && results.options[0]) results.options[0].textContent = found.Name + (found.ProductionYear ? ' (' + found.ProductionYear + ')' : '');
+                });
+            }
+            var timer = null;
+            search.addEventListener('input', function () {
+                window.clearTimeout(timer);
+                timer = window.setTimeout(function () {
+                    if (!search.value.trim()) return;
+                    call('GET', 'Items?Recursive=true&IncludeItemTypes=Movie,Series&Limit=20&SearchTerm=' + encodeURIComponent(search.value.trim()) + '&UserId=' + ApiClient.getCurrentUserId()).then(function (r) {
+                        var items = r.ok ? r.body.Items : [];
+                        results.textContent = '';
+                        items.forEach(function (it) {
+                            var option = results.appendChild(el('option', it.Name + (it.ProductionYear ? ' (' + it.ProductionYear + ')' : '')));
+                            option.value = plainId(it.Id);
+                        });
+                        if (items.length) { setKey(config, 'ButtonTarget', results.value); changed(false); }
+                    });
+                }, 300);
+            });
+        }
+
+        var dismiss = field(box, 'Viewers can dismiss it', input('checkbox', 'announce-dismissible'));
+        dismiss.checked = !!configValue(config, 'Dismissible');
+        dismiss.addEventListener('change', function () { setKey(config, 'Dismissible', dismiss.checked || undefined); changed(false); });
+    }
+
     function selected(node) {
         return Array.prototype.filter.call(node.options, function (o) { return o.selected; }).map(function (o) { return o.value; });
     }
@@ -620,10 +732,15 @@
     function drawSource(parent, change, needsId) {
         var section = change.Section || (change.Section = { Id: '', Type: 'query', Title: '', Config: { Genres: [], ItemTypes: 'Movie,Series' } });
         var box = parent.appendChild(el('div', null, 'em-prog-source'));
-        var type = field(box, 'Shows', select('source-type', [{ value: 'query', text: 'Titles by genre or tag' }, { value: 'collection', text: 'A collection' }], section.Type));
+        var kinds = [{ value: 'query', text: 'Titles by genre or tag' }, { value: 'collection', text: 'A collection' }];
+        // An announcement can be added or swapped in; the featured banner shows titles.
+        if (change.Kind !== 'featured') kinds.push({ value: 'announcement', text: 'An announcement' });
+        var type = field(box, 'Shows', select('source-type', kinds, section.Type));
         type.addEventListener('change', function () {
             section.Type = type.value;
-            section.Config = type.value === 'query' ? { Genres: [], ItemTypes: 'Movie,Series' } : { Collection: state.collections.length ? state.collections[0].Id : '' };
+            section.Config = type.value === 'query' ? { Genres: [], ItemTypes: 'Movie,Series' }
+                : type.value === 'announcement' ? { Text: '', Dismissible: true }
+                : { Collection: state.collections.length ? state.collections[0].Id : '' };
             draw();
         });
         var config = section.Config || (section.Config = {});
@@ -631,7 +748,9 @@
             section.Title = x.target.value;
             if (needsId && change.autoId !== false) section.Id = slug(x.target.value);
         });
-        if (section.Type === 'query') {
+        if (section.Type === 'announcement') {
+            announcementFields(box, section, { libraries: state.libraries, collections: state.collections }, function (redraw) { if (redraw) draw(); });
+        } else if (section.Type === 'query') {
             var genres = field(box, 'Genres', select('genres', state.genres.map(function (g) { return { value: g, text: g }; }), configValue(config, 'Genres') || [], true));
             genres.addEventListener('change', function () { config.Genres = selected(genres); delete config.genres; });
             var tags = field(box, 'Tags', select('tags', state.tags.map(function (g) { return { value: g, text: g }; }), configValue(config, 'Tags') || [], true));
@@ -774,6 +893,7 @@
 
     window.ExperienceManagerProgramming = {
         pure: pure,
+        announcementFields: announcementFields,
         draw: function (panel) {
             root = panel.appendChild(el('div', null, 'em-prog'));
             var status = root.appendChild(el('p', 'Loading…', 'em-muted'));

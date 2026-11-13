@@ -24,7 +24,8 @@ namespace Jellyfin.Plugin.ExperienceManager.Home;
 /// <param name="Change">What that event did: one of the change kinds, or null.</param>
 /// <param name="Items">Its first items, when the preview asked for them.</param>
 /// <param name="Notes">What each content rule left out of it.</param>
-public sealed record PreviewSection(string Id, string Title, string Source, string Display, string? Event, string? Change, IReadOnlyList<PreviewItem>? Items = null, IReadOnlyList<string>? Notes = null);
+/// <param name="Announcement">For an announcement, what it says.</param>
+public sealed record PreviewSection(string Id, string Title, string Source, string Display, string? Event, string? Change, IReadOnlyList<PreviewItem>? Items = null, IReadOnlyList<string>? Notes = null, Announcements.Announcement? Announcement = null);
 
 /// <summary>
 /// An item in a previewed section, enough to draw its card.
@@ -83,6 +84,7 @@ public sealed class StoredPages : IPages
     private readonly HomeCache _cache;
     private readonly IHomeSources _sources;
     private readonly TimeProvider _time;
+    private readonly Announcements.DismissalStore? _dismissals;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StoredPages"/> class.
@@ -94,13 +96,15 @@ public sealed class StoredPages : IPages
     /// <param name="published">The published version, which Home serves; previews and badges read the draft.</param>
     /// <param name="cache">The home cache.</param>
     /// <param name="sources">The user's libraries and what they may see.</param>
-    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, Publishing.PublishStore published, HomeCache cache, IHomeSources sources)
-        : this(store, events, cache, sources, TimeProvider.System, audiences, rules, published)
+    /// <param name="dismissals">The announcements each user dismissed.</param>
+    public StoredPages(PageStore store, EventTimeline events, AudienceResolver audiences, RuleFilter rules, Publishing.PublishStore published, HomeCache cache, IHomeSources sources, Announcements.DismissalStore dismissals)
+        : this(store, events, cache, sources, TimeProvider.System, audiences, rules, published, dismissals)
     {
     }
 
-    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null, Publishing.PublishStore? published = null)
+    internal StoredPages(PageStore store, EventTimeline events, HomeCache cache, IHomeSources sources, TimeProvider time, AudienceResolver? audiences = null, RuleFilter? rules = null, Publishing.PublishStore? published = null, Announcements.DismissalStore? dismissals = null)
     {
+        _dismissals = dismissals;
         _published = published;
         _store = store;
         _events = events;
@@ -126,7 +130,8 @@ public sealed class StoredPages : IPages
         return (_published is null ? page.LayoutVersion : "p" + _published.ContentKey)
             + (layout.AudienceId is null ? string.Empty : "-g" + layout.AudienceId + "." + layout.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture))
             + (_published is null && _rules is { Revision: > 1 } ? "-c" + _rules.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty)
-            + (key.Length == 0 ? string.Empty : "-e" + key);
+            + (key.Length == 0 ? string.Empty : "-e" + key)
+            + (user is null || _dismissals?.Key(user.Id) is not { Length: > 0 } dismissed ? string.Empty : "-d" + dismissed);
     }
 
     /// <inheritdoc />
@@ -141,7 +146,7 @@ public sealed class StoredPages : IPages
         var views = new Lazy<IReadOnlyList<LibraryView>>(() => _sources.GetViews(user));
         var audiences = AudiencesOf(user);
         return EventOverlay.Apply(Expand(LayoutOf(page, audiences, live: true).Sections, views), ForAudiences(Active(page.Id, utcOffset), audiences).Events)
-            .Select(slot => Build(slot, views))
+            .Select(slot => Build(slot, views, viewer: user, dismissals: true))
             .OfType<PageSection>()
             .ToList();
     }
@@ -190,7 +195,7 @@ public sealed class StoredPages : IPages
         var gone = new List<HiddenSection>();
         var raws = new Dictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>(StringComparer.OrdinalIgnoreCase);
         var sections = EventOverlay.Apply(expanded, active.Where(e => Applies(e, audiences)).ToList(), gone)
-            .Select(slot => (Slot: slot, Section: Build(slot, views, raws)))
+            .Select(slot => (Slot: slot, Section: Build(slot, views, raws, user)))
             .Where(p => p.Section is not null)
             .Select(p => Describe(p.Section!, p.Slot, raws.GetValueOrDefault(p.Section!.Id), user, audiences, items))
             .ToList();
@@ -211,7 +216,7 @@ public sealed class StoredPages : IPages
                 .ToList();
         }
 
-        return new PreviewSection(section.Id, section.Title, section.Source.Kind, section.Display.Hint, slot.Event, slot.Change, items, notes);
+        return new PreviewSection(section.Id, section.Title, section.Source.Kind, section.Display.Hint, slot.Event, slot.Change, items, notes, section.Announcement);
     }
 
     /// <summary>
@@ -328,7 +333,8 @@ public sealed class StoredPages : IPages
     private ActiveEvents Active(string pageId, int? utcOffset) =>
         pageId == PageIds.Home ? _events.For(utcOffset) : new ActiveEvents([], string.Empty, null);
 
-    private PageSection? Build(PageSlot slot, Lazy<IReadOnlyList<LibraryView>> views, IDictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>? raws = null)
+    // viewer: whose button targets count; dismissals: leave out what the viewer dismissed, as Home does and previews do not.
+    private PageSection? Build(PageSlot slot, Lazy<IReadOnlyList<LibraryView>> views, IDictionary<string, (RuleTarget Target, Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load)>? raws = null, User? viewer = null, bool dismissals = false)
     {
         var stored = slot.Section;
         var config = new SectionConfig(stored.Config);
@@ -382,9 +388,38 @@ public sealed class StoredPages : IPages
                     new SectionSource(SectionSources.Collection, collection.ToString("N")),
                     null,
                     u => Watched(u, config, Visible(u, _cache.Collection(collection, out var hit), hit)));
+            case SectionTypes.Announcement:
+                var content = Announcements.AnnouncementContent.Of(stored);
+                if (dismissals && viewer is not null && content.Dismissible && _dismissals?.IsDismissed(viewer.Id, stored.Id, content.Version) == true)
+                {
+                    return null;
+                }
+
+                return new PageSection(stored.Id, content.Title ?? string.Empty, row, new SectionSource(SectionSources.Section), null, 0, _ => ([], true), Announce(content, viewer, views));
             default:
                 return null;
         }
+    }
+
+    // What an announcement says to a viewer: its button only when they can open what it opens.
+    private Announcements.Announcement Announce(Announcements.AnnouncementContent content, User? viewer, Lazy<IReadOnlyList<LibraryView>> views)
+    {
+        Announcements.AnnouncementButton? button = null;
+        if (content.ButtonTarget is { } target && content.ButtonLabel is { } label)
+        {
+            var view = viewer is null ? null : views.Value.FirstOrDefault(v => v.Id.Equals(target));
+            if (view is not null)
+            {
+                button = new(label, target.ToString("N"), "library", view.Type?.ToString());
+            }
+            else if (_cache.Item(target) is { } item && item is not ICollectionFolder && (viewer is null || _sources.IsVisible(item, viewer)))
+            {
+                button = new(label, target.ToString("N"), item is MediaBrowser.Controller.Entities.Movies.BoxSet ? "collection" : "item", null);
+            }
+        }
+
+        var image = content.ImageId is null ? null : "/ExperienceManager/v1/Images/" + content.ImageId;
+        return new Announcements.Announcement(content.Lines, image, button, content.Dismissible, content.Version);
     }
 
     // A library the user cannot see has no section.

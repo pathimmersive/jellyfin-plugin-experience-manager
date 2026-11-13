@@ -31,17 +31,28 @@ public class HomeApiController : ControllerBase
     internal const int MaxLimit = 100;
 
     private static readonly string[] ApiVersions = ["v1"];
-    private static readonly string[] Features = ["pages", "section-items"];
+    private static readonly string[] Features = ["pages", "section-items", "announcements"];
 
     private readonly HomePageService _home;
     private readonly IUserManager _users;
+    private readonly Announcements.DismissalStore? _dismissals;
+    private readonly Announcements.AnnouncementImages? _images;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HomeApiController"/> class.
     /// </summary>
     /// <param name="home">The home page service.</param>
     /// <param name="users">The user manager.</param>
-    public HomeApiController(HomePageService home, IUserManager users)
+    /// <param name="dismissals">The announcements each user dismissed.</param>
+    /// <param name="images">The images uploaded for announcements.</param>
+    public HomeApiController(HomePageService home, IUserManager users, Announcements.DismissalStore dismissals, Announcements.AnnouncementImages images)
+        : this(home, users)
+    {
+        _dismissals = dismissals;
+        _images = images;
+    }
+
+    internal HomeApiController(HomePageService home, IUserManager users)
     {
         _home = home;
         _users = users;
@@ -150,6 +161,57 @@ public class HomeApiController : ControllerBase
 
         SetServerTiming(timing is null ? [] : [timing]);
         return WithETag(items);
+    }
+
+    /// <summary>
+    /// Dismisses an announcement on the signed-in user's Home, on every device, until it changes.
+    /// </summary>
+    /// <param name="sectionId">The announcement's section id.</param>
+    /// <param name="utcOffset">The viewer's UTC offset in minutes, as sent for the page, for announcements an event adds.</param>
+    /// <returns>204, or 404 when the user's Home has no such announcement or it cannot be dismissed.</returns>
+    [HttpPost("v1/Sections/{sectionId}/Dismiss")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult Dismiss([FromRoute] string sectionId, [FromQuery] int? utcOffset = null)
+    {
+        var user = SignedInUser();
+        if (user is null)
+        {
+            return Forbid();
+        }
+
+        var section = _home.FindSection(user, sectionId, utcOffset);
+        if (section?.Announcement is not { Dismissible: true } announcement || _dismissals is null)
+        {
+            return NotFound();
+        }
+
+        _dismissals.Dismiss(user.Id, section.Id, announcement.Version);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Gets an image uploaded for an announcement. Images are named by their content, so an address never changes
+    /// what it serves; no token is needed, as for Jellyfin's own item images.
+    /// </summary>
+    /// <param name="imageId">The image id, as an announcement's <c>Image</c> path ends.</param>
+    /// <returns>The image, or 404.</returns>
+    [HttpGet("v1/Images/{imageId}")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Produces("image/png", "image/jpeg", "image/webp")]
+    public ActionResult GetImage([FromRoute] string imageId)
+    {
+        if (_images?.Open(imageId) is not { } image)
+        {
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        return File(image, Announcements.AnnouncementImages.ContentType(imageId));
     }
 
     /// <summary>

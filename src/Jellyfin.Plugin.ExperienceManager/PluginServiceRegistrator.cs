@@ -42,6 +42,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, UserDeletedRecorder>();
         serviceCollection.AddSingleton<EventStore>();
         serviceCollection.AddSingleton<RulesStore>();
+        serviceCollection.AddSingleton<Announcements.DismissalStore>();
+        serviceCollection.AddSingleton<Announcements.AnnouncementImages>();
         serviceCollection.AddSingleton<RuleFilter>();
         serviceCollection.AddSingleton<PublishStore>();
         serviceCollection.AddHostedService<HistoryLog>();

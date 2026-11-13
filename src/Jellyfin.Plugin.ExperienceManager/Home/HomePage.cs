@@ -55,6 +55,7 @@ public static class SectionSources
 /// <param name="SeeAll">Where "see all" leads, or null.</param>
 /// <param name="FirstPage">How many items the page call inlines.</param>
 /// <param name="Load">Loads every item the user may see, in order, and whether they came from the cache.</param>
+/// <param name="Announcement">For an announcement, what it says to this user; it has no items.</param>
 public sealed record PageSection(
     string Id,
     string Title,
@@ -62,7 +63,8 @@ public sealed record PageSection(
     SectionSource Source,
     SeeAllTarget? SeeAll,
     int FirstPage,
-    Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load);
+    Func<User, (IReadOnlyList<BaseItem> Items, bool Hit)> Load,
+    Announcements.Announcement? Announcement = null);
 
 /// <summary>
 /// The pages, each resolved into its sections for a user.
