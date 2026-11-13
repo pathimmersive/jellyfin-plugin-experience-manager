@@ -43,7 +43,8 @@ Each section has:
 | `Kind` | The content kind. `items` is a row of Jellyfin items; `announcement` is a message from the admin (see Announcements). |
 | `Display.Hint` | `feature` for a large banner, `row` for a row of cards. |
 | `Display.Shape` | The card shape: `portrait`, `landscape` or `square`. |
-| `Rank` | Whether cards show their position, as in a Top 10. |
+| `Rank` | Whether cards show their position, as in a Top 10: number them 1, 2, 3 in the order given. |
+| `Chips` | A short label for some of the section's cards, such as `2 of 3 watched`, keyed by item id; absent or null when there are none. |
 | `SeeAll` | Where "see all" leads, as a Jellyfin item query, or absent. |
 | `Items` | The first items, when the page call inlined them. |
 | `Error` | Present when the section's source failed: show a short message or hide the section. |

@@ -118,7 +118,7 @@ public sealed partial class HomePageService
 
             built[i] = section.Announcement is { } announcement
                 ? new SectionResponse(section.Id, section.Title, "announcement", section.Display, false, null, null, null, announcement)
-                : new SectionResponse(section.Id, section.Title, "items", section.Display, false, section.SeeAll, items, error);
+                : new SectionResponse(section.Id, section.Title, "items", section.Display, section.Rank, section.SeeAll, items, error, null, ChipsFor(section, user));
         });
 
         timings = measured.OfType<SectionTiming>().ToList();
@@ -184,6 +184,10 @@ public sealed partial class HomePageService
             EnableUserData = shape.EnableUserData ?? true,
         };
     }
+
+    // The section's chips, keyed as the items' ids are written in the response.
+    private static Dictionary<string, string>? ChipsFor(PageSection section, User user) =>
+        section.Chips?.Invoke(user) is { Count: > 0 } chips ? chips.ToDictionary(c => c.Key.ToString("N"), c => c.Value) : null;
 
     // One batched DTO call for the page of items; never one call per item.
     private QueryResult<BaseItemDto> Page(PageSection section, IReadOnlyList<BaseItem> all, int startIndex, int limit, ItemShape shape, User user)

@@ -35,6 +35,7 @@ public sealed record SeeAllTarget(string? ParentId, string IncludeItemTypes, str
 /// <param name="Items">The first items, when the page call asked for them.</param>
 /// <param name="Error">Why the items are missing, when the section failed.</param>
 /// <param name="Announcement">For an announcement, what it says; null for every other kind.</param>
+/// <param name="Chips">A short label to show on some of the section's cards, such as "2 of 3 watched", by item id; null when there are none.</param>
 public sealed record SectionResponse(
     string Id,
     string Title,
@@ -44,7 +45,8 @@ public sealed record SectionResponse(
     SeeAllTarget? SeeAll,
     QueryResult<BaseItemDto>? Items,
     string? Error,
-    Announcements.Announcement? Announcement = null);
+    Announcements.Announcement? Announcement = null,
+    IReadOnlyDictionary<string, string>? Chips = null);
 
 /// <summary>
 /// A resolved page: its sections in order.

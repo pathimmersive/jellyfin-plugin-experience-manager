@@ -59,6 +59,6 @@ test('a new section gets an id of its own, and Latest for each library is held o
     assert.equal(l.hasLatestLibraries(rows), true);
     assert.equal(l.hasLatestLibraries([row('latest', 'latest-libraries', 'removed')]), false);
     assert.deepEqual(l.newSection('announcement', rows), { Id: 'announcement', Type: 'announcement', Config: { Text: '', Dismissible: true } });
-    assert.deepEqual(l.TYPES.map(t => t.type), ['featured', 'mymedia', 'continue', 'nextup', 'latest-libraries', 'latest', 'query', 'collection', 'announcement']);
+    assert.deepEqual(l.TYPES.map(t => t.type), ['featured', 'mymedia', 'continue', 'nextup', 'latest-libraries', 'latest', 'query', 'collection', 'announcement', 'top10-films', 'top10-shows', 'finish-collections']);
     assert.ok(l.TYPES.every(t => t.about.length > 10));
 });

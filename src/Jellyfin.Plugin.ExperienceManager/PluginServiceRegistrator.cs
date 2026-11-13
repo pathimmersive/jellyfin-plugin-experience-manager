@@ -33,6 +33,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<IStartupFilter, IndexPageStartupFilter>();
 
         serviceCollection.AddSingleton<HomeCache>();
+        serviceCollection.AddSingleton<PlayedRows>();
         serviceCollection.AddSingleton<IHomeSources, JellyfinHomeSources>();
         serviceCollection.AddSingleton(services => new LayoutDatabase(LayoutDatabase.DefaultPath(services.GetRequiredService<IApplicationPaths>())));
         serviceCollection.AddSingleton<PageStore>();

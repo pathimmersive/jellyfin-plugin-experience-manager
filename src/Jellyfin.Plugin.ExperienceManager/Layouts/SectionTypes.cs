@@ -48,8 +48,17 @@ public static class SectionTypes
     /// </summary>
     public const string Announcement = "announcement";
 
+    /// <summary>The films the most different users played in the last 7 days, ranked.</summary>
+    public const string TopFilms = "top10-films";
+
+    /// <summary>The shows the most different users played an episode of in the last 7 days, ranked.</summary>
+    public const string TopShows = "top10-shows";
+
+    /// <summary>The collections the user has started and not finished.</summary>
+    public const string FinishCollections = "finish-collections";
+
     /// <summary>Every type, in the order the admin API lists them.</summary>
-    public static readonly IReadOnlyList<string> All = [Featured, MyMedia, ContinueWatching, NextUp, LatestLibraries, Latest, Query, Collection, Announcement];
+    public static readonly IReadOnlyList<string> All = [Featured, MyMedia, ContinueWatching, NextUp, LatestLibraries, Latest, Query, Collection, Announcement, TopFilms, TopShows, FinishCollections];
 
     /// <summary>
     /// Checks a section's config for its type.
